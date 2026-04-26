@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MDMT v2 – Maszynka do mielenia tekstu</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0c0e; --surface: #16161a; --surface2: #1e1e24; --border: #2a2a35;
+  --accent: #c8f135; --accent-dim: rgba(200,241,53,0.12);
+  --text: #ebebf0; --muted: #7a7a8c;
+  --danger: #ff4f4f; --success: #2ecc71; --warning: #f59e0b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; min-height: 100vh; }
+
+/* LOGIN */
+.login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.login-card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 16px; padding: 40px 36px; width: 100%; max-width: 360px; }
+.login-logo { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 32px; }
+.login-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.login-name { font-size: 15px; font-weight: 700; color: #fff; }
+.login-err { display: none; color: #f87171; font-size: 13px; margin-top: 12px; padding: 10px; background: rgba(239,68,68,.1); border-radius: 8px; text-align: center; }
+
+/* HEADER */
+.header { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; background: rgba(12,12,14,0.92); backdrop-filter: blur(12px); flex-wrap: wrap; gap: 8px; }
+.logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 13px; letter-spacing: -0.3px; display: flex; align-items: center; gap: 8px; }
+.logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
+.nav { display: flex; gap: 2px; background: var(--surface); padding: 4px; border-radius: 10px; flex-wrap: wrap; }
+.nav-btn { padding: 7px 14px; border-radius: 7px; border: none; background: transparent; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.18s; white-space: nowrap; }
+.nav-btn.active { background: var(--accent); color: #000; font-weight: 600; }
+.nav-btn:hover:not(.active) { color: var(--text); }
+
+/* MAIN */
+.main { max-width: 880px; margin: 0 auto; padding: 36px 24px 80px; }
+.page { display: none; animation: fadeIn 0.2s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* SECTIONS */
+.sec-header { margin-bottom: 28px; }
+.sec-title { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 6px; }
+.sec-sub { color: var(--muted); font-size: 13px; }
+
+/* CARDS */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px; margin-bottom: 16px; }
+.card-title { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent); margin-bottom: 18px; }
+
+/* GRID */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid.full { grid-template-columns: 1fr; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field.col2 { grid-column: span 2; }
+
+/* LABELS + INPUTS */
+label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+input, textarea, select { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 10px 13px; outline: none; width: 100%; transition: border-color 0.15s; }
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+textarea { resize: vertical; min-height: 88px; line-height: 1.6; }
+select option { background: var(--surface2); }
+.hint-text { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+input[type="datetime-local"] { color-scheme: dark; }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 11px 22px; border-radius: 9px; border: none; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.18s; }
+.btn-primary { background: var(--accent); color: #000; font-weight: 700; }
+.btn-primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: var(--accent); }
+.btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--border); }
+.btn-danger:hover { border-color: var(--danger); }
+.btn-sm { padding: 7px 14px; font-size: 13px; }
+.btn-row { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+
+/* BADGES */
+.badge { font-size: 10px; padding: 3px 9px; border-radius: 20px; font-weight: 600; letter-spacing: 0.5px; }
+.badge-wp  { background: rgba(33,117,255,0.15); color: #5b9fff; border: 1px solid rgba(33,117,255,0.3); }
+.badge-joomla { background: rgba(255,122,0,0.15); color: #ff9d4d; border: 1px solid rgba(255,122,0,0.3); }
+.badge-drupal { background: rgba(0,115,170,0.15); color: #4db8e8; border: 1px solid rgba(0,115,170,0.3); }
+.badge-ok  { background: rgba(46,204,113,0.15); color: var(--success); border: 1px solid rgba(46,204,113,0.3); }
+.badge-warn { background: rgba(245,158,11,0.12); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+.badge-err { background: rgba(255,79,79,0.12); color: var(--danger); border: 1px solid rgba(255,79,79,0.3); }
+.badge-draft { background: rgba(122,122,140,0.12); color: var(--muted); border: 1px solid var(--border); }
+
+/* NOTICES */
+.notice { padding: 12px 14px; border-radius: 9px; font-size: 12px; line-height: 1.6; margin-bottom: 16px; }
+.notice-info { background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.2); color: #a78bfa; }
+.notice-warn { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); color: var(--warning); }
+.notice-ok   { background: rgba(46,204,113,0.08); border: 1px solid rgba(46,204,113,0.2); color: var(--success); }
+
+/* PIPELINE */
+.pipeline { margin: 8px 0 28px; }
+.step { display: flex; gap: 16px; padding: 18px 0; border-left: 2px solid var(--border); padding-left: 28px; margin-left: 14px; position: relative; }
+.step:last-child { border-left-color: transparent; }
+.step-dot { width: 30px; height: 30px; border-radius: 50%; background: var(--surface2); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 13px; position: absolute; left: -16px; top: 18px; transition: all 0.3s; }
+.step.running .step-dot { border-color: var(--accent); background: var(--accent-dim); animation: glow 1.2s infinite; }
+.step.done .step-dot    { border-color: var(--success); background: rgba(46,204,113,0.12); }
+.step.error .step-dot   { border-color: var(--danger); background: rgba(255,79,79,0.1); }
+.step.skip .step-dot    { border-color: var(--muted); background: var(--surface2); }
+@keyframes glow { 0%,100%{box-shadow:0 0 0 0 rgba(200,241,53,.35)}50%{box-shadow:0 0 0 7px rgba(200,241,53,0)} }
+.step-content { flex: 1; min-width: 0; }
+.step-label { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+.step-msg { font-size: 12px; color: var(--muted); }
+.step.running .step-msg { color: var(--accent); }
+.step.done .step-msg    { color: var(--success); }
+.step.error .step-msg   { color: var(--danger); }
+.out-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.7; white-space: pre-wrap; max-height: 180px; overflow-y: auto; display: none; word-break: break-word; }
+.out-box.open { display: block; }
+.imgs-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.img-box { aspect-ratio: 16/9; background: var(--surface2); border: 1px dashed var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; overflow: hidden; }
+.img-box img { width: 100%; height: 100%; object-fit: cover; }
+
+/* RESULT */
+.result { background: linear-gradient(135deg, rgba(200,241,53,0.06), transparent); border: 1px solid rgba(200,241,53,0.3); border-radius: 14px; padding: 24px; margin-top: 24px; display: none; }
+.result.on { display: block; }
+.result-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--accent); margin-bottom: 10px; }
+.result-link { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600; text-decoration: none; margin-top: 10px; font-size: 14px; }
+.result-link:hover { text-decoration: underline; }
+
+/* STATUS BAR */
+.status-bar { display: none; align-items: center; gap: 10px; padding: 11px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; margin-bottom: 20px; font-size: 13px; }
+.status-bar.on { display: flex; }
+.s-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; animation: glow 1.2s infinite; }
+
+/* SITES LIST */
+.site-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; transition: border-color 0.2s; }
+.site-card.complete { border-color: rgba(46,204,113,0.3); }
+.site-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; cursor: pointer; user-select: none; }
+.site-header:hover { background: rgba(255,255,255,0.02); }
+.site-meta { display: flex; flex-direction: column; gap: 4px; }
+.site-name-row { display: flex; align-items: center; gap: 8px; }
+.site-name { font-weight: 600; font-size: 14px; }
+.site-url-text { font-size: 11px; color: var(--muted); }
+.site-right { display: flex; align-items: center; gap: 8px; }
+.icon-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); cursor: pointer; padding: 5px 9px; font-size: 13px; transition: all 0.15s; }
+.icon-btn:hover { border-color: var(--accent); color: var(--text); }
+.icon-btn.del:hover { border-color: var(--danger); color: var(--danger); }
+.site-body { border-top: 1px solid var(--border); padding: 16px; display: none; }
+.site-body.open { display: block; }
+.site-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.site-grid .field.col2 { grid-column: span 2; }
+.pass-wrap { position: relative; }
+.pass-wrap input { padding-right: 42px; }
+.eye { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px; }
+
+/* ADD SITE FORM */
+.add-site-panel { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; display: none; }
+.add-site-panel.open { display: block; }
+
+/* HISTORY TABLE */
+.hist-filters { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.hist-table-wrap { overflow-x: auto; }
+.hist-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.hist-table th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.hist-table td { padding: 10px 12px; border-bottom: 1px solid rgba(42,42,53,0.5); vertical-align: top; }
+.hist-table tr:hover td { background: rgba(255,255,255,0.02); }
+.hist-topic { font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-link { color: var(--accent); text-decoration: none; font-size: 12px; }
+.hist-link:hover { text-decoration: underline; }
+.hist-empty { text-align: center; padding: 48px 0; color: var(--muted); font-size: 13px; }
+.hist-err-msg { font-size: 11px; color: var(--danger); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* SITE SELECTOR IN BRIEF */
+.site-selector-wrap { display: flex; gap: 10px; align-items: flex-end; }
+.site-selector-wrap select { flex: 1; }
+.selected-site-info { margin-top: 8px; display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+
+/* MISC */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.char-count { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
+.toggle-row { display: flex; align-items: center; gap: 10px; }
+.toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 10px; transition: .3s; cursor: pointer; }
+.toggle-slider:before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: .3s; }
+.toggle input:checked + .toggle-slider { background: var(--accent); }
+.toggle input:checked + .toggle-slider:before { transform: translateX(16px); background: #000; }
+.cms-hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; padding: 8px 10px; background: rgba(200,241,53,0.05); border: 1px solid rgba(200,241,53,0.15); border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══════════════════════════════════════════════════════════════ -->
+<div id="login-screen" class="login-wrap">
+<div class="login-card">
+  <div class="login-logo"><div class="login-dot"></div><span class="login-name">MDMT v2</span></div>
+  <div class="field" style="margin-bottom:0">
+    <label for="pwd">Hasło dostępu</label>
+    <input id="pwd" type="password" placeholder="Wpisz hasło..." autofocus onkeydown="if(event.key==='Enter')doLogin()">
+  </div>
+  <button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="doLogin()" id="login-btn">Zaloguj →</button>
+  <div class="login-err" id="login-err">Nieprawidłowe hasło. Spróbuj ponownie.</div>
+</div>
+</div>
+
+<!-- ═══ APP ══════════════════════════════════════════════════════════════════ -->
+<div id="app" style="display:none">
+
+<header class="header">
+  <div class="logo"><div class="logo-dot"></div><span>MDMT v2</span></div>
+  <nav class="nav">
+    <button class="nav-btn active" onclick="nav('brief')">📝 Brief</button>
+    <button class="nav-btn" onclick="nav('run')">▶ Uruchom</button>
+    <button class="nav-btn" onclick="nav('sites')">🌐 Baza blogów</button>
+    <button class="nav-btn" onclick="nav('history')">📊 Historia</button>
+    <button class="nav-btn" onclick="nav('settings')">⚙️ Ustawienia</button>
+  </nav>
+</header>
+
+<main class="main">
+
+<!-- ═══ BRIEF ════════════════════════════════════════════════════════════════ -->
+<div class="page active" id="page-brief">
+  <div class="sec-header">
+    <div class="sec-title">Nowy wpis</div>
+    <div class="sec-sub">Wypełnij brief, wybierz blog, agent zajmie się resztą</div>
+  </div>
+
+  <!-- Wybór witryny -->
+  <div class="card">
+    <div class="card-title">🌐 Docelowy blog</div>
+    <div class="field">
+      <label>Wybierz witrynę *</label>
+      <div class="site-selector-wrap">
+        <select id="site-select" onchange="onSiteSelect()">
+          <option value="">— wybierz blog —</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="nav('sites')">+ Dodaj blog</button>
+      </div>
+      <div class="selected-site-info" id="selected-site-info" style="display:none">
+        <span id="selected-site-badge"></span>
+        <span id="selected-site-url"></span>
+      </div>
+    </div>
+    <div style="margin-top:14px" class="field">
+      <label>Data i godzina publikacji (opcjonalnie – puste = natychmiast)</label>
+      <input type="datetime-local" id="scheduled_at" style="max-width:280px">
+      <div class="hint-text">Zostaw puste aby opublikować od razu po zakończeniu pipeline'u</div>
+    </div>
+  </div>
+
+  <!-- Podstawowe -->
+  <div class="card">
+    <div class="card-title">Podstawowe informacje</div>
+    <div class="grid">
+      <div class="field col2">
+        <label>Temat / tytuł artykułu *</label>
+        <input id="topic" type="text" placeholder="np. Jak wybrać buty do biegania w górach?" oninput="countChars('topic','topic-count')">
+        <div class="char-count" id="topic-count">0 znaków</div>
+      </div>
+      <div class="field">
+        <label>Długość tekstu</label>
+        <select id="length" onchange="checkLengthWarn()">
+          <option value="3000">Krótki ~400-500 słów (3000 zzs)</option>
+          <option value="4000" selected>Średni ~550-700 słów (4000 zzs)</option>
+          <option value="5000">Długi ~700-900 słów (5000 zzs)</option>
+          <option value="6000">Bardzo długi ~800-1000 słów (6000 zzs)</option>
+        </select>
+        <div id="length-warn" style="display:none;font-size:11px;color:var(--warning);margin-top:4px">⚠️ Przy Claude Sonnet może przekroczyć limit. Zalecany: <strong>Gemini Flash</strong>.</div>
+      </div>
+      <div class="field">
+        <label>Ton i styl</label>
+        <select id="tone">
+          <option value="ekspercki">Ekspercki</option>
+          <option value="przyjazny i naturalny" selected>Przyjazny / naturalny</option>
+          <option value="formalny">Formalny</option>
+          <option value="luźny i konwersacyjny">Luźny / conversational</option>
+        </select>
+      </div>
+      <div class="field col2">
+        <label>Grupa docelowa</label>
+        <input id="audience" type="text" placeholder="np. Początkujący biegacze górscy, 25–45 lat">
+      </div>
+    </div>
+  </div>
+
+  <!-- SEO -->
+  <div class="card">
+    <div class="card-title">SEO</div>
+    <div class="grid">
+      <div class="field col2">
+        <label>Frazy kluczowe (oddziel przecinkami) *</label>
+        <input id="keywords" type="text" placeholder="np. buty do biegania w górach, trail running, buty trailowe">
+        <div class="hint-text">Pierwsza fraza = główna. Wskazówka: używaj naturalnej formy: <strong>podróż do Norwegii</strong> zamiast <strong>Norwegia podróż</strong></div>
+      </div>
+      <div class="field col2">
+        <label>Linkowanie – anchor | URL (każda para w osobnej linii)</label>
+        <textarea id="link_pairs" style="min-height:100px;font-family:monospace;font-size:13px" placeholder="tekst anchora | https://twoja-strona.pl/artykul&#10;inna fraza | https://zewnetrzna.pl/strona | nofollow"></textarea>
+        <div class="hint-text">Format: <strong>anchor | URL</strong> lub <strong>anchor | URL | nofollow</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meta SEO -->
+  <div class="card">
+    <div class="card-title">🔍 Meta dane SEO</div>
+    <div class="grid">
+      <div class="field col2">
+        <label>Meta title (opcjonalnie – max 60 znaków)</label>
+        <input id="meta_title_input" type="text" maxlength="70" placeholder="Zostaw puste – agent wygeneruje automatycznie" oninput="countChars('meta_title_input','mt-count')">
+        <div class="char-count" id="mt-count">0/60</div>
+      </div>
+      <div class="field col2">
+        <label>Meta description (opcjonalnie – max 155 znaków)</label>
+        <textarea id="meta_desc_input" style="min-height:70px" maxlength="170" placeholder="Zostaw puste – agent wygeneruje automatycznie" oninput="countChars('meta_desc_input','md-count')"></textarea>
+        <div class="char-count" id="md-count">0/155</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zdjęcia -->
+  <div class="card">
+    <div class="card-title">🖼 Zdjęcia AI</div>
+    <div class="grid">
+      <div class="field col2">
+        <div class="toggle-row">
+          <label class="toggle"><input type="checkbox" id="img1-toggle" checked><span class="toggle-slider"></span></label>
+          <span style="font-size:13px">Zdjęcie wyróżnione (featured)</span>
+        </div>
+      </div>
+      <div class="field col2">
+        <label>Prompt zdjęcia wyróżnionego</label>
+        <input id="img1_prompt" type="text" placeholder="np. Profesjonalne buty trailowe na górskim szlaku, złota godzina">
+      </div>
+      <div class="field">
+        <label>Alt text zdjęcia 1</label>
+        <input id="img1_alt" type="text" placeholder="np. Buty do biegania w górach na szlaku">
+      </div>
+      <div class="field">
+        <label>Tytuł zdjęcia (SEO)</label>
+        <input id="img_title" type="text" placeholder="np. buty-trailowe-gory">
+      </div>
+      <div class="field col2" style="margin-top:8px">
+        <div class="toggle-row">
+          <label class="toggle"><input type="checkbox" id="img2-toggle"><span class="toggle-slider"></span></label>
+          <span style="font-size:13px">Zdjęcie śródtekstowe (opcjonalnie)</span>
+        </div>
+      </div>
+      <div class="field col2">
+        <label>Prompt zdjęcia śródtekstowego</label>
+        <input id="img2_prompt" type="text" placeholder="np. Zbliżenie na podeszwę buta trailowego, detal techniczny">
+      </div>
+      <div class="field">
+        <label>Alt text zdjęcia 2</label>
+        <input id="img2_alt" type="text" placeholder="np. Podeszwa buta do biegania w terenie">
+      </div>
+    </div>
+  </div>
+
+  <!-- Dodatkowe -->
+  <div class="card">
+    <div class="card-title">Dodatkowe wytyczne</div>
+    <div class="grid full">
+      <div class="field">
+        <label>Tagi (oddziel przecinkami)</label>
+        <input id="tags" type="text" placeholder="np. buty, bieganie, góry, trail">
+      </div>
+      <div class="field">
+        <label>Kategorie (ID lub nazwy, oddziel przecinkami)</label>
+        <input id="categories" type="text" placeholder="np. Sport, Bieganie">
+      </div>
+      <div class="field">
+        <label>Slug URL (opcjonalnie)</label>
+        <input id="post_slug" type="text" placeholder="np. buty-do-biegania-w-gorach – zostaw puste = auto">
+      </div>
+      <div class="field">
+        <label>Dodatkowe wytyczne dla pisarza</label>
+        <textarea id="extra_info" placeholder="np. Wspomnij o testach laboratoryjnych, unikaj nazw konkurencji, dodaj przykłady z życia"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="nav('run');runPipeline()">▶ Uruchom agenta</button>
+    <button class="btn btn-ghost" onclick="clearBrief()">🗑 Wyczyść brief</button>
+  </div>
+</div>
+
+<!-- ═══ RUN ═══════════════════════════════════════════════════════════════════ -->
+<div class="page" id="page-run">
+  <div class="sec-header">
+    <div class="sec-title">Pipeline</div>
+    <div class="sec-sub" id="run-site-info">Brak wybranego bloga</div>
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    <div class="s-dot"></div>
+    <span id="status-text">Trwa przetwarzanie...</span>
+  </div>
+
+  <div class="pipeline">
+    <div class="step" id="step-research">
+      <div class="step-dot">🔍</div>
+      <div class="step-content">
+        <div class="step-label">Research</div>
+        <div class="step-msg" id="msg-research">Oczekiwanie...</div>
+        <div class="out-box" id="out-research"></div>
+      </div>
+    </div>
+    <div class="step" id="step-write">
+      <div class="step-dot">✍️</div>
+      <div class="step-content">
+        <div class="step-label">Pisanie artykułu</div>
+        <div class="step-msg" id="msg-write">Oczekiwanie...</div>
+        <div class="out-box" id="out-write"></div>
+      </div>
+    </div>
+    <div class="step" id="step-proofread">
+      <div class="step-dot">✅</div>
+      <div class="step-content">
+        <div class="step-label">Korekta językowa</div>
+        <div class="step-msg" id="msg-proofread">Oczekiwanie...</div>
+      </div>
+    </div>
+    <div class="step" id="step-seo">
+      <div class="step-dot">📈</div>
+      <div class="step-content">
+        <div class="step-label">Meta SEO</div>
+        <div class="step-msg" id="msg-seo">Oczekiwanie...</div>
+        <div class="out-box" id="out-seo"></div>
+      </div>
+    </div>
+    <div class="step" id="step-img1">
+      <div class="step-dot">🖼</div>
+      <div class="step-content">
+        <div class="step-label">Zdjęcie wyróżnione</div>
+        <div class="step-msg" id="msg-img1">Oczekiwanie...</div>
+        <div class="imgs-row"><div class="img-box" id="img1-preview">Brak zdjęcia</div></div>
+      </div>
+    </div>
+    <div class="step" id="step-publish">
+      <div class="step-dot">🚀</div>
+      <div class="step-content">
+        <div class="step-label">Publikacja</div>
+        <div class="step-msg" id="msg-publish">Oczekiwanie...</div>
+      </div>
+    </div>
+    <div class="step" id="step-img2">
+      <div class="step-dot">🖼</div>
+      <div class="step-content">
+        <div class="step-label">Zdjęcie śródtekstowe</div>
+        <div class="step-msg" id="msg-img2">Oczekiwanie...</div>
+        <div class="imgs-row"><div class="img-box" id="img2-preview">Brak zdjęcia</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="result" id="result-box">
+    <div class="result-title">✅ Opublikowano!</div>
+    <div id="result-meta" style="font-size:13px;color:var(--muted);line-height:1.8"></div>
+    <a id="result-link" href="#" target="_blank" class="result-link">🔗 Otwórz wpis →</a>
+  </div>
+</div>
+
+<!-- ═══ BAZA BLOGÓW ══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-sites">
+  <div class="sec-header">
+    <div class="sec-title">Baza blogów</div>
+    <div class="sec-sub">Zarządzaj witrynami WordPress, Joomla i Drupal</div>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+    <button class="btn btn-primary btn-sm" onclick="toggleAddPanel()">+ Dodaj witrynę</button>
+    <button class="btn btn-ghost btn-sm" onclick="importSitesJSON()">📥 Importuj JSON</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportSitesJSON()">📤 Eksportuj JSON</button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImportFile(this)">
+  </div>
+
+  <!-- ADD SITE FORM -->
+  <div class="add-site-panel" id="add-site-panel">
+    <div class="card-title" style="margin-bottom:16px">➕ Nowa witryna</div>
+    <div class="site-grid">
+      <div class="field col2">
+        <label>Nazwa witryny *</label>
+        <input id="ns-name" type="text" placeholder="np. Blog techniczny">
+      </div>
+      <div class="field col2">
+        <label>URL witryny * (bez trailing slash)</label>
+        <input id="ns-url" type="url" placeholder="https://twoja-strona.pl">
+      </div>
+      <div class="field">
+        <label>CMS *</label>
+        <select id="ns-cms" onchange="onNsCmsChange()">
+          <option value="wordpress">WordPress</option>
+          <option value="joomla">Joomla 4+</option>
+          <option value="drupal">Drupal</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Status domyślny</label>
+        <select id="ns-status">
+          <option value="draft">Szkic (draft)</option>
+          <option value="publish">Opublikowany</option>
+        </select>
+      </div>
+      <div class="field" id="ns-login-field">
+        <label id="ns-login-label">Login / nazwa użytkownika *</label>
+        <input id="ns-login" type="text" placeholder="admin">
+      </div>
+      <div class="field">
+        <div class="pass-wrap">
+          <label id="ns-pass-label">Hasło / App Password *</label>
+          <input id="ns-pass" type="password" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx">
+          <button class="eye" onclick="toggleEye('ns-pass',this)">👁</button>
+        </div>
+      </div>
+      <div class="field col2" id="ns-cms-hint"></div>
+      <div class="field">
+        <label>Tagi domyślne (przecinkami)</label>
+        <input id="ns-tags" type="text" placeholder="np. tech, AI">
+      </div>
+      <div class="field">
+        <label>Kategorie domyślne (ID lub nazwy)</label>
+        <input id="ns-categories" type="text" placeholder="np. 1,3 lub Technologia">
+      </div>
+      <div class="field col2">
+        <label>Notatki (widoczne tylko tutaj)</label>
+        <textarea id="ns-notes" style="min-height:60px" placeholder="np. Blog główny klienta XYZ, kontakt: jan@example.com"></textarea>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-primary btn-sm" onclick="saveSite()">💾 Zapisz witrynę</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleAddPanel()">Anuluj</button>
+    </div>
+  </div>
+
+  <!-- SITES LIST -->
+  <div id="sites-list">
+    <div style="text-align:center;padding:48px 0;color:var(--muted);font-size:13px">Ładowanie witryn...</div>
+  </div>
+</div>
+
+<!-- ═══ HISTORIA ═════════════════════════════════════════════════════════════ -->
+<div class="page" id="page-history">
+  <div class="sec-header">
+    <div class="sec-title">Historia publikacji</div>
+    <div class="sec-sub">Ostatnie 200 wpisów</div>
+  </div>
+
+  <div class="hist-filters">
+    <select id="hist-filter" onchange="filterHistory()" style="width:auto;padding:8px 12px">
+      <option value="">Wszystkie statusy</option>
+      <option value="published">Opublikowane</option>
+      <option value="draft">Szkice</option>
+      <option value="error">Błędy</option>
+    </select>
+    <select id="hist-cms-filter" onchange="filterHistory()" style="width:auto;padding:8px 12px">
+      <option value="">Wszystkie CMS</option>
+      <option value="wordpress">WordPress</option>
+      <option value="joomla">Joomla</option>
+      <option value="drupal">Drupal</option>
+    </select>
+    <button class="btn btn-ghost btn-sm" onclick="loadHistory()">🔄 Odśwież</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportHistoryCSV()">📥 Eksportuj CSV</button>
+  </div>
+
+  <div class="hist-table-wrap">
+    <table class="hist-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Temat</th>
+          <th>Blog</th>
+          <th>CMS</th>
+          <th>Model</th>
+          <th>Znaki</th>
+          <th>Status</th>
+          <th>Link</th>
+        </tr>
+      </thead>
+      <tbody id="hist-tbody">
+        <tr><td colspan="8" class="hist-empty">Ładowanie historii...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ USTAWIENIA ═══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-settings">
+  <div class="sec-header">
+    <div class="sec-title">Ustawienia</div>
+    <div class="sec-sub">Model AI, prompty systemowe</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Model AI</div>
+    <div class="grid">
+      <div class="field col2">
+        <label>Dostawca i model</label>
+        <select id="api_provider">
+          <option value="gemini">Gemini 2.5 Flash (zalecany – szybki, tani)</option>
+          <option value="claude">Claude Sonnet (wysoka jakość)</option>
+          <option value="claude_haiku">Claude Haiku (szybki, tańszy)</option>
+          <option value="openai">OpenAI GPT-4o-mini</option>
+        </select>
+      </div>
+      <div class="field col2">
+        <label>Niestandardowy identyfikator modelu (opcjonalnie)</label>
+        <input id="api_model" type="text" placeholder="np. gemini-2.0-flash – zostaw puste = domyślny">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">System prompt – pisanie</div>
+    <div class="field">
+      <label>Master prompt (zostaw puste = domyślny wbudowany)</label>
+      <textarea id="masterprompt" style="min-height:180px;font-family:monospace;font-size:12px" placeholder="Jesteś copywriterem SEO..."></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">System prompt – research</div>
+    <div class="field">
+      <label>Research prompt (zostaw puste = domyślny wbudowany)</label>
+      <textarea id="researchprompt" style="min-height:120px;font-family:monospace;font-size:12px" placeholder="Jesteś asystentem do researchu SEO..."></textarea>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="saveSettings()">💾 Zapisz ustawienia</button>
+    <button class="btn btn-ghost" onclick="resetSettings()">↩ Przywróć domyślne</button>
+  </div>
+  <div id="settings-saved" style="display:none;margin-top:12px;font-size:13px;color:var(--success)">✅ Ustawienia zapisane</div>
+</div>
+
+</main>
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════
+let allSites = [];
+let selectedSite = null;
+let allHistory = [];
+let pipelineRunning = false;
+let runStartTime = 0;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════════════════════
+async function doLogin() {
+  const pwd = document.getElementById('pwd').value;
+  if (!pwd) return;
+  const btn = document.getElementById('login-btn');
+  btn.textContent = 'Sprawdzam...'; btn.disabled = true;
+  try {
+    const r = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password:pwd}) });
+    const d = await r.json();
+    if (d.ok || d.disabled) { showApp(); }
+    else { document.getElementById('login-err').style.display='block'; btn.textContent='Zaloguj →'; btn.disabled=false; }
+  } catch(e) { btn.textContent='Zaloguj →'; btn.disabled=false; }
+}
+
+function checkSession() {
+  const hasCookie = document.cookie.includes('ab_session=');
+  if (hasCookie) { showApp(); }
+  else {
+    fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:'__check__'})})
+      .then(r=>r.json()).then(d=>{ if(d.disabled) showApp(); }).catch(()=>{});
+  }
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  loadSites();
+  loadHistory();
+  loadSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════════════════════════════════
+function nav(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  const idx = {brief:0,run:1,sites:2,history:3,settings:4}[page] ?? 0;
+  document.querySelectorAll('.nav-btn')[idx]?.classList.add('active');
+  if (page === 'history') loadHistory();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SITES
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadSites() {
+  try {
+    const r = await fetch('/api/sites');
+    const d = await r.json();
+    allSites = d.sites || [];
+    renderSiteSelector();
+    renderSitesList();
+  } catch(e) {
+    console.error('loadSites:', e);
+  }
+}
+
+function renderSiteSelector() {
+  const sel = document.getElementById('site-select');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— wybierz blog —</option>';
+  allSites.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = `${s.name} (${s.cms.toUpperCase()})`;
+    sel.appendChild(opt);
+  });
+  if (prev && allSites.find(s => s.id === prev)) sel.value = prev;
+  onSiteSelect();
+}
+
+function onSiteSelect() {
+  const id = document.getElementById('site-select').value;
+  selectedSite = allSites.find(s => s.id === id) || null;
+  const info = document.getElementById('selected-site-info');
+  if (selectedSite) {
+    info.style.display = 'flex';
+    document.getElementById('selected-site-badge').innerHTML = cmsBadge(selectedSite.cms);
+    document.getElementById('selected-site-url').textContent = selectedSite.url;
+  } else {
+    info.style.display = 'none';
+  }
+}
+
+function cmsBadge(cms) {
+  const map = { wordpress:'WP', joomla:'Joomla', drupal:'Drupal' };
+  const cls = { wordpress:'badge-wp', joomla:'badge-joomla', drupal:'badge-drupal' };
+  return `<span class="badge ${cls[cms] || 'badge-draft'}">${map[cms] || cms.toUpperCase()}</span>`;
+}
+
+function renderSitesList() {
+  const el = document.getElementById('sites-list');
+  if (!allSites.length) {
+    el.innerHTML = '<div style="text-align:center;padding:48px 0;color:var(--muted);font-size:13px">Brak witryn. Dodaj pierwszą klikając "+ Dodaj witrynę".</div>';
+    return;
+  }
+  el.innerHTML = allSites.map(s => `
+    <div class="site-card" id="sc-${s.id}">
+      <div class="site-header" onclick="toggleSiteBody('${s.id}')">
+        <div class="site-meta">
+          <div class="site-name-row">
+            ${cmsBadge(s.cms)}
+            <span class="site-name">${esc(s.name)}</span>
+          </div>
+          <div class="site-url-text">${esc(s.url)}</div>
+        </div>
+        <div class="site-right">
+          <span class="badge ${s.default_status === 'publish' ? 'badge-ok' : 'badge-draft'}">${s.default_status === 'publish' ? 'Publiczny' : 'Szkic'}</span>
+          <button class="icon-btn" onclick="event.stopPropagation();editSite('${s.id}')" title="Edytuj">✏️</button>
+          <button class="icon-btn del" onclick="event.stopPropagation();deleteSite('${s.id}')" title="Usuń">🗑</button>
+        </div>
+      </div>
+      <div class="site-body" id="sb-${s.id}">
+        <div class="site-grid">
+          <div class="field">
+            <label>Login</label>
+            <input type="text" value="${esc(s.login)}" readonly style="opacity:0.6">
+          </div>
+          <div class="field">
+            <label>${s.cms === 'joomla' ? 'API Token' : 'Hasło / App Password'}</label>
+            <div class="pass-wrap">
+              <input type="password" id="pass-${s.id}" value="${esc(s.password_enc)}" readonly style="opacity:0.6">
+              <button class="eye" onclick="toggleEye('pass-${s.id}',this)">👁</button>
+            </div>
+          </div>
+          ${s.tags ? `<div class="field"><label>Tagi</label><input type="text" value="${esc(s.tags)}" readonly style="opacity:0.6"></div>` : ''}
+          ${s.categories ? `<div class="field"><label>Kategorie</label><input type="text" value="${esc(s.categories)}" readonly style="opacity:0.6"></div>` : ''}
+          ${s.notes ? `<div class="field col2"><label>Notatki</label><textarea readonly style="opacity:0.6;min-height:60px">${esc(s.notes)}</textarea></div>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleSiteBody(id) {
+  const el = document.getElementById('sb-' + id);
+  el.classList.toggle('open');
+}
+
+function toggleAddPanel() {
+  const el = document.getElementById('add-site-panel');
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) {
+    clearAddForm();
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function clearAddForm() {
+  ['ns-name','ns-url','ns-login','ns-pass','ns-tags','ns-categories','ns-notes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('ns-cms').value = 'wordpress';
+  document.getElementById('ns-status').value = 'draft';
+  document.getElementById('add-site-panel').dataset.editId = '';
+  document.querySelector('#add-site-panel .card-title').textContent = '➕ Nowa witryna';
+  onNsCmsChange();
+}
+
+function onNsCmsChange() {
+  const cms = document.getElementById('ns-cms').value;
+  const loginField = document.getElementById('ns-login-field');
+  const loginLabel = document.getElementById('ns-login-label');
+  const passLabel  = document.getElementById('ns-pass-label');
+  const hint       = document.getElementById('ns-cms-hint');
+
+  if (cms === 'joomla') {
+    loginLabel.textContent = 'Login (opcjonalny – do notatek)';
+    passLabel.textContent  = 'API Token * (Joomla → System → API Tokens)';
+    hint.innerHTML = '<div class="cms-hint">Joomla: wejdź w <strong>System → API Tokens</strong>, utwórz nowy token i wklej go w pole powyżej. Login nie jest używany do autoryzacji.</div>';
+  } else if (cms === 'drupal') {
+    loginLabel.textContent = 'Login Drupal *';
+    passLabel.textContent  = 'Hasło Drupal * (wymaga modułu basic_auth)';
+    hint.innerHTML = '<div class="cms-hint">Drupal: upewnij się że moduł <strong>HTTP Basic Authentication</strong> jest włączony (<em>Admin → Extend</em>). Użytkownik musi mieć rolę z uprawnieniem tworzenia artykułów.</div>';
+  } else {
+    loginLabel.textContent = 'Login WordPress *';
+    passLabel.textContent  = 'App Password * (WP → Użytkownicy → Profil → Hasła aplikacji)';
+    hint.innerHTML = '';
+  }
+}
+
+async function saveSite() {
+  const id   = document.getElementById('add-site-panel').dataset.editId;
+  const name = document.getElementById('ns-name').value.trim();
+  const url  = document.getElementById('ns-url').value.trim();
+  const cms  = document.getElementById('ns-cms').value;
+  const login = document.getElementById('ns-login').value.trim();
+  const pass = document.getElementById('ns-pass').value.trim();
+  const tags = document.getElementById('ns-tags').value.trim();
+  const categories = document.getElementById('ns-categories').value.trim();
+  const default_status = document.getElementById('ns-status').value;
+  const notes = document.getElementById('ns-notes').value.trim();
+
+  if (!name || !url) return alert('Podaj nazwę i URL witryny.');
+  if (!pass) return alert('Podaj hasło / API token.');
+
+  const payload = { name, url, cms, login, password: pass, tags, categories, default_status, notes };
+
+  try {
+    let r;
+    if (id) {
+      payload.id = id;
+      r = await fetch('/api/sites', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    } else {
+      r = await fetch('/api/sites', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    }
+    const d = await r.json();
+    if (d.error) return alert('Błąd: ' + d.error);
+    await loadSites();
+    toggleAddPanel();
+  } catch(e) {
+    alert('Błąd zapisu: ' + e.message);
+  }
+}
+
+function editSite(id) {
+  const s = allSites.find(x => x.id === id);
+  if (!s) return;
+  const panel = document.getElementById('add-site-panel');
+  panel.classList.add('open');
+  panel.dataset.editId = id;
+  panel.querySelector('.card-title').textContent = '✏️ Edycja: ' + s.name;
+  document.getElementById('ns-name').value = s.name;
+  document.getElementById('ns-url').value  = s.url;
+  document.getElementById('ns-cms').value  = s.cms;
+  document.getElementById('ns-status').value = s.default_status || 'draft';
+  document.getElementById('ns-login').value = s.login;
+  document.getElementById('ns-pass').value  = s.password_enc;
+  document.getElementById('ns-tags').value  = s.tags || '';
+  document.getElementById('ns-categories').value = s.categories || '';
+  document.getElementById('ns-notes').value = s.notes || '';
+  onNsCmsChange();
+  panel.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+async function deleteSite(id) {
+  const s = allSites.find(x => x.id === id);
+  if (!confirm(`Usunąć witrynę "${s?.name}"? Tej operacji nie można cofnąć.`)) return;
+  const r = await fetch('/api/sites', { method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id}) });
+  const d = await r.json();
+  if (d.error) return alert('Błąd: ' + d.error);
+  await loadSites();
+}
+
+function exportSitesJSON() {
+  const data = allSites.map(s => ({
+    name: s.name, url: s.url, cms: s.cms, login: s.login,
+    password: s.password_enc, tags: s.tags, categories: s.categories,
+    default_status: s.default_status, notes: s.notes
+  }));
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mdmt-blogi-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
+function importSitesJSON() {
+  document.getElementById('import-file').click();
+}
+
+async function handleImportFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!Array.isArray(data)) return alert('Nieprawidłowy format – oczekiwana tablica JSON.');
+    let ok = 0, err = 0;
+    for (const s of data) {
+      if (!s.name || !s.url || !s.password) { err++; continue; }
+      const r = await fetch('/api/sites', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name:s.name, url:s.url, cms:s.cms||'wordpress', login:s.login||'', password:s.password, tags:s.tags||'', categories:s.categories||'', default_status:s.default_status||'draft', notes:s.notes||'' })
+      });
+      const d = await r.json();
+      d.error ? err++ : ok++;
+    }
+    await loadSites();
+    alert(`Import zakończony. Dodano: ${ok}, błędów: ${err}.`);
+  } catch(e) {
+    alert('Błąd importu: ' + e.message);
+  }
+  input.value = '';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadHistory() {
+  try {
+    const r = await fetch('/api/history');
+    const d = await r.json();
+    allHistory = d.publications || [];
+    filterHistory();
+  } catch(e) {
+    console.error('loadHistory:', e);
+  }
+}
+
+function filterHistory() {
+  const statusF = document.getElementById('hist-filter')?.value || '';
+  const cmsF    = document.getElementById('hist-cms-filter')?.value || '';
+  let data = allHistory;
+  if (statusF) data = data.filter(p => p.status === statusF);
+  if (cmsF)    data = data.filter(p => p.cms === cmsF);
+  renderHistory(data);
+}
+
+function renderHistory(data) {
+  const tbody = document.getElementById('hist-tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="hist-empty">Brak wpisów w historii</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(p => {
+    const dt   = new Date(p.created_at).toLocaleString('pl-PL', { dateStyle:'short', timeStyle:'short' });
+    const badge = p.status === 'published' ? 'badge-ok' : p.status === 'error' ? 'badge-err' : 'badge-draft';
+    const statusLabel = { published:'Opublikowany', draft:'Szkic', error:'Błąd', skipped:'Pominięty' }[p.status] || p.status;
+    return `<tr>
+      <td style="white-space:nowrap;color:var(--muted)">${dt}</td>
+      <td><div class="hist-topic" title="${esc(p.topic)}">${esc(p.topic)}</div></td>
+      <td style="white-space:nowrap">${esc(p.site_name)}</td>
+      <td>${cmsBadge(p.cms)}</td>
+      <td style="color:var(--muted);font-size:12px">${esc(p.model_used || '—')}</td>
+      <td style="color:var(--muted)">${p.char_count ? p.char_count.toLocaleString() : '—'}</td>
+      <td><span class="badge ${badge}">${statusLabel}</span>${p.error_message ? `<div class="hist-err-msg" title="${esc(p.error_message)}">${esc(p.error_message)}</div>` : ''}</td>
+      <td>${p.post_url ? `<a href="${esc(p.post_url)}" target="_blank" class="hist-link">🔗 Otwórz</a>` : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportHistoryCSV() {
+  const rows = [['Data','Temat','Blog','URL bloga','CMS','Model','Znaki','Status','URL wpisu','Błąd']];
+  allHistory.forEach(p => rows.push([
+    new Date(p.created_at).toLocaleString('pl-PL'),
+    p.topic, p.site_name, p.site_url, p.cms, p.model_used||'',
+    p.char_count||0, p.status, p.post_url||'', p.error_message||''
+  ]));
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mdmt-historia-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+async function saveToHistory(data) {
+  try {
+    await fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch(e) {
+    console.warn('saveToHistory error:', e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════
+function loadSettings() {
+  const s = JSON.parse(localStorage.getItem('mdmt_settings') || '{}');
+  if (s.api_provider) document.getElementById('api_provider').value = s.api_provider;
+  if (s.api_model)    document.getElementById('api_model').value    = s.api_model;
+  if (s.masterprompt) document.getElementById('masterprompt').value = s.masterprompt;
+  if (s.researchprompt) document.getElementById('researchprompt').value = s.researchprompt;
+}
+
+function saveSettings() {
+  const s = {
+    api_provider:   document.getElementById('api_provider').value,
+    api_model:      document.getElementById('api_model').value,
+    masterprompt:   document.getElementById('masterprompt').value,
+    researchprompt: document.getElementById('researchprompt').value,
+  };
+  localStorage.setItem('mdmt_settings', JSON.stringify(s));
+  const el = document.getElementById('settings-saved');
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3000);
+}
+
+function resetSettings() {
+  if (!confirm('Przywrócić domyślne ustawienia?')) return;
+  localStorage.removeItem('mdmt_settings');
+  document.getElementById('api_provider').value = 'gemini';
+  document.getElementById('api_model').value    = '';
+  document.getElementById('masterprompt').value = '';
+  document.getElementById('researchprompt').value = '';
+}
+
+function getSettings() {
+  return JSON.parse(localStorage.getItem('mdmt_settings') || '{}');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PIPELINE
+// ═══════════════════════════════════════════════════════════════════════════
+function resetPipeline() {
+  ['research','write','proofread','seo','img1','publish','img2'].forEach(id => {
+    const step = document.getElementById('step-' + id);
+    step.className = 'step';
+    document.getElementById('msg-' + id).textContent = 'Oczekiwanie...';
+    const out = document.getElementById('out-' + id);
+    if (out) { out.textContent = ''; out.classList.remove('open'); }
+  });
+  document.getElementById('img1-preview').innerHTML = 'Brak zdjęcia';
+  document.getElementById('img2-preview').innerHTML = 'Brak zdjęcia';
+  document.getElementById('result-box').classList.remove('on');
+  document.getElementById('status-bar').classList.remove('on');
+}
+
+function setStep(id, state, msg) {
+  const step = document.getElementById('step-' + id);
+  step.className = 'step ' + state;
+  document.getElementById('msg-' + id).textContent = msg;
+}
+
+function setOut(id, text) {
+  const el = document.getElementById('out-' + id);
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add('open');
+}
+
+async function runPipeline() {
+  if (pipelineRunning) return;
+  if (!selectedSite) {
+    alert('Wybierz witrynę docelową w zakładce Brief.');
+    nav('brief');
+    return;
+  }
+
+  const topic    = document.getElementById('topic').value.trim();
+  const keywords = document.getElementById('keywords').value.trim();
+  if (!topic)    { alert('Podaj temat artykułu.'); nav('brief'); return; }
+  if (!keywords) { alert('Podaj frazy kluczowe.'); nav('brief'); return; }
+
+  pipelineRunning = true;
+  runStartTime = Date.now();
+  resetPipeline();
+
+  const settings  = getSettings();
+  const site      = selectedSite;
+  const cms       = site.cms;
+
+  // Pola briefu
+  const length        = document.getElementById('length').value;
+  const tone          = document.getElementById('tone').value;
+  const audience      = document.getElementById('audience').value.trim();
+  const link_pairs    = document.getElementById('link_pairs').value.trim();
+  const extra_info    = document.getElementById('extra_info').value.trim();
+  const meta_title_in = document.getElementById('meta_title_input').value.trim();
+  const meta_desc_in  = document.getElementById('meta_desc_input').value.trim();
+  const tags          = document.getElementById('tags').value.trim() || site.tags || '';
+  const categories    = document.getElementById('categories').value.trim() || site.categories || '';
+  const post_slug     = document.getElementById('post_slug').value.trim();
+  const scheduled_at  = document.getElementById('scheduled_at').value || null;
+  const img1On        = document.getElementById('img1-toggle').checked;
+  const img2On        = document.getElementById('img2-toggle').checked;
+  const img1_prompt   = document.getElementById('img1_prompt').value.trim();
+  const img2_prompt   = document.getElementById('img2_prompt').value.trim();
+  const img1_alt      = document.getElementById('img1_alt').value.trim();
+  const img2_alt      = document.getElementById('img2_alt').value.trim();
+  const img_title     = document.getElementById('img_title').value.trim();
+
+  const status_val = scheduled_at ? 'future' : (site.default_status || 'draft');
+
+  document.getElementById('status-bar').classList.add('on');
+  document.getElementById('status-text').textContent = 'Trwa przetwarzanie...';
+  document.getElementById('run-site-info').textContent = `${site.name} · ${cms.toUpperCase()} · ${site.url}`;
+
+  const apiBase = { api_provider: settings.api_provider || 'gemini', api_model: settings.api_model || '' };
+  let research = '', article = '', meta = {}, postId = null, postLink = '';
+
+  // ── 1. RESEARCH ──────────────────────────────────────────────────────────
+  setStep('research', 'running', 'Zbieram dane o temacie...');
+  try {
+    const r = await fetch('/api/research', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      ...apiBase, topic, keywords, audience, extra_info,
+      researchprompt: settings.researchprompt || ''
+    })});
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    research = d.result;
+    setStep('research', 'done', 'Research gotowy');
+    setOut('research', research);
+  } catch(e) {
+    setStep('research', 'error', 'Błąd: ' + e.message);
+    return finishPipeline(false, e.message, topic, keywords, site);
+  }
+
+  // ── 2. WRITE ─────────────────────────────────────────────────────────────
+  setStep('write', 'running', 'Piszę artykuł (' + length + ' zzs)...');
+  try {
+    const r = await fetch('/api/write', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      ...apiBase, topic, keywords, length, tone, audience, link_pairs, extra_info, research,
+      masterprompt: settings.masterprompt || ''
+    })});
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    article = d.result;
+    const charCount = article.replace(/<[^>]+>/g,'').length;
+    setStep('write', 'done', `Artykuł gotowy (${charCount.toLocaleString()} zzs)`);
+    setOut('write', article.replace(/<[^>]+>/g,'').substring(0, 300) + '...');
+  } catch(e) {
+    setStep('write', 'error', 'Błąd: ' + e.message);
+    return finishPipeline(false, e.message, topic, keywords, site);
+  }
+
+  // ── 3. PROOFREAD ─────────────────────────────────────────────────────────
+  setStep('proofread', 'running', 'Sprawdzam tekst...');
+  try {
+    const r = await fetch('/api/proofread', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      ...apiBase, article, keywords
+    })});
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    article = d.result;
+    setStep('proofread', 'done', d.skipped ? `Pominięto korektę (${d.reason})` : 'Korekta zakończona');
+  } catch(e) {
+    setStep('proofread', 'skip', 'Pominięto (błąd: ' + e.message + ')');
+  }
+
+  // ── 4. SEO ───────────────────────────────────────────────────────────────
+  setStep('seo', 'running', 'Generuję meta dane...');
+  try {
+    const r = await fetch('/api/seo', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      ...apiBase, article, topic, main_keyword: keywords.split(',')[0].trim()
+    })});
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    meta = d.result;
+    // Nadpisz jeśli użytkownik wpisał ręcznie
+    if (meta_title_in) meta.meta_title = meta_title_in;
+    if (meta_desc_in)  meta.meta_description = meta_desc_in;
+    setStep('seo', 'done', 'Meta dane gotowe');
+    setOut('seo', `Title: ${meta.meta_title}\nDesc: ${meta.meta_description}`);
+  } catch(e) {
+    setStep('seo', 'error', 'Błąd: ' + e.message);
+    meta = { meta_title: meta_title_in || topic.substring(0,60), meta_description: meta_desc_in || '' };
+  }
+
+  // ── 5. PUBLISH ───────────────────────────────────────────────────────────
+  setStep('publish', 'running', `Publikuję na ${cms.toUpperCase()}...`);
+  try {
+    const r = await fetch('/api/publish', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      cms,
+      site_url:   site.url,
+      site_login: site.login,
+      site_pass:  site.password_enc,
+      title:      topic,
+      brief_topic: topic,
+      content:    article,
+      status:     status_val,
+      excerpt:    article.replace(/<[^>]+>/g,'').substring(0, 150),
+      meta_title: meta.meta_title || '',
+      meta_desc:  meta.meta_description || '',
+      tags, categories, post_slug, scheduled_at
+    })});
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    postId   = d.id;
+    postLink = d.link || '';
+    setStep('publish', 'done', `Opublikowano (ID: ${postId})`);
+  } catch(e) {
+    setStep('publish', 'error', 'Błąd: ' + e.message);
+    return finishPipeline(false, e.message, topic, keywords, site, meta);
+  }
+
+  // ── 6. ZDJĘCIE 1 ─────────────────────────────────────────────────────────
+  if (img1On && img1_prompt) {
+    setStep('img1', 'running', 'Generuję zdjęcie wyróżnione...');
+    try {
+      const r = await fetch('/api/images', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+        cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
+        post_id: postId, image_num: 1,
+        prompt1: img1_prompt, alt1: img1_alt || topic, img_title
+      })});
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      if (d.image_url) {
+        document.getElementById('img1-preview').innerHTML = `<img src="${d.image_url}" alt="featured">`;
+      }
+      setStep('img1', 'done', `Zdjęcie dodane${d.compressed ? ' (skompresowane)' : ''}`);
+    } catch(e) {
+      setStep('img1', 'error', 'Błąd: ' + e.message);
+    }
+  } else {
+    setStep('img1', 'skip', img1On ? 'Brak promptu – pominięto' : 'Pominięto');
+  }
+
+  // ── 7. ZDJĘCIE 2 ─────────────────────────────────────────────────────────
+  if (img2On && img2_prompt) {
+    setStep('img2', 'running', 'Generuję zdjęcie śródtekstowe...');
+    try {
+      const r = await fetch('/api/images', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+        cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
+        post_id: postId, image_num: 2,
+        prompt1: img1_prompt, prompt2: img2_prompt,
+        alt1: img1_alt || topic, alt2: img2_alt || topic, img_title
+      })});
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      if (d.image_url) {
+        document.getElementById('img2-preview').innerHTML = `<img src="${d.image_url}" alt="srodtekstowe">`;
+      }
+      setStep('img2', 'done', `Zdjęcie dodane${d.compressed ? ' (skompresowane)' : ''}`);
+    } catch(e) {
+      setStep('img2', 'error', 'Błąd: ' + e.message);
+    }
+  } else {
+    setStep('img2', 'skip', img2On ? 'Brak promptu – pominięto' : 'Pominięto');
+  }
+
+  // ── SUKCES ────────────────────────────────────────────────────────────────
+  finishPipeline(true, '', topic, keywords, site, meta, postId, postLink, article);
+}
+
+async function finishPipeline(success, errMsg, topic, keywords, site, meta, postId, postLink, article) {
+  pipelineRunning = false;
+  const duration = Date.now() - runStartTime;
+  const settings = getSettings();
+  const charCount = article ? article.replace(/<[^>]+>/g,'').length : 0;
+  const status = success ? (document.getElementById('scheduled_at').value ? 'draft' : 'published') : 'error';
+
+  document.getElementById('status-bar').classList.remove('on');
+
+  if (success) {
+    const box = document.getElementById('result-box');
+    box.classList.add('on');
+    const scheduled_at = document.getElementById('scheduled_at').value;
+    document.getElementById('result-meta').innerHTML = `
+      <strong>Blog:</strong> ${esc(site.name)} (${site.cms.toUpperCase()})<br>
+      <strong>Temat:</strong> ${esc(topic)}<br>
+      <strong>Meta title:</strong> ${esc(meta?.meta_title || '—')}<br>
+      <strong>Czas:</strong> ${Math.round(duration/1000)}s
+      ${scheduled_at ? `<br><strong>Zaplanowano na:</strong> ${new Date(scheduled_at).toLocaleString('pl-PL')}` : ''}
+    `;
+    const link = document.getElementById('result-link');
+    if (postLink) { link.href = postLink; link.style.display = 'inline-flex'; }
+    else link.style.display = 'none';
+  }
+
+  await saveToHistory({
+    topic, keywords: keywords || '',
+    site_id: site.id, site_name: site.name, site_url: site.url, cms: site.cms,
+    model_used: settings.api_provider || 'gemini',
+    char_count: charCount, status,
+    post_url: postLink || '', post_id: postId ? String(postId) : '',
+    error_message: errMsg || '',
+    duration_ms: duration,
+    scheduled_at: document.getElementById('scheduled_at').value || null
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+function countChars(inputId, countId) {
+  const len = document.getElementById(inputId).value.length;
+  const el  = document.getElementById(countId);
+  if (!el) return;
+  el.textContent = len > 0 ? len + ' znaków' : '0 znaków';
+}
+
+function checkLengthWarn() {
+  const len = parseInt(document.getElementById('length').value);
+  const settings = getSettings();
+  const isClaude = (settings.api_provider || 'gemini').includes('claude');
+  document.getElementById('length-warn').style.display = (len >= 5000 && isClaude) ? 'block' : 'none';
+}
+
+function toggleEye(inputId, btn) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  el.type = el.type === 'password' ? 'text' : 'password';
+  btn.textContent = el.type === 'password' ? '👁' : '🙈';
+}
+
+function clearBrief() {
+  if (!confirm('Wyczyścić wszystkie pola briefu?')) return;
+  ['topic','keywords','audience','link_pairs','extra_info','meta_title_input','meta_desc_input',
+   'tags','categories','post_slug','img1_prompt','img2_prompt','img1_alt','img2_alt','img_title','scheduled_at'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('length').value = '4000';
+  document.getElementById('tone').value = 'przyjazny i naturalny';
+  document.getElementById('topic-count').textContent = '0 znaków';
+}
+
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════
+checkSession();
+</script>
+</body>
+</html>
