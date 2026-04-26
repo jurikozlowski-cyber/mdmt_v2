@@ -1,14 +1,4 @@
 {
-  "functions": {
-    "api/auth.js": { "maxDuration": 60 },
-    "api/research.js": { "maxDuration": 60 },
-    "api/write.js": { "maxDuration": 60 },
-    "api/proofread.js": { "maxDuration": 60 },
-    "api/seo.js": { "maxDuration": 60 },
-    "api/images.js": { "maxDuration": 60 },
-    "api/publish.js": { "maxDuration": 60 },
-    "api/update_post.js": { "maxDuration": 60 },
-    "api/sites.js": { "maxDuration": 60 },
-    "api/history.js": { "maxDuration": 60 }
-  }
+  "buildCommand": "",
+  "outputDirectory": "public"
 }
