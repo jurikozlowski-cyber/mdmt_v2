@@ -448,6 +448,11 @@ input[type="datetime-local"] { color-scheme: dark; }
     </div>
   </div>
 
+  <div class="btn-row" id="pipeline-btns" style="display:none;margin-bottom:8px">
+    <button class="btn btn-ghost" id="abort-btn" onclick="abortPipeline()" style="color:var(--danger);border-color:var(--danger)">⏹ Przerwij</button>
+    <button class="btn btn-ghost" id="retry-btn" onclick="retryPipeline()" style="display:none">🔄 Ponów</button>
+  </div>
+
   <div class="result" id="result-box">
     <div class="result-title">✅ Opublikowano!</div>
     <div id="result-meta" style="font-size:13px;color:var(--muted);line-height:1.8"></div>
@@ -638,6 +643,7 @@ let allSites = [];
 let selectedSite = null;
 let allHistory = [];
 let pipelineRunning = false;
+let pipelineAborted = false;
 let runStartTime = 0;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1111,6 +1117,8 @@ function resetPipeline() {
   document.getElementById('img2-preview').innerHTML = 'Brak zdjęcia';
   document.getElementById('result-box').classList.remove('on');
   document.getElementById('status-bar').classList.remove('on');
+  document.getElementById('abort-btn').style.display = 'none';
+  document.getElementById('retry-btn').style.display = 'inline-flex';
 }
 
 function setStep(id, state, msg) {
@@ -1128,11 +1136,7 @@ function setOut(id, text) {
 
 async function runPipeline() {
   if (pipelineRunning) return;
-  if (!selectedSite) {
-    alert('Wybierz witrynę docelową w zakładce Brief.');
-    nav('brief');
-    return;
-  }
+  if (!selectedSite) { alert('Wybierz witrynę docelową w zakładce Brief.'); nav('brief'); return; }
 
   const topic    = document.getElementById('topic').value.trim();
   const keywords = document.getElementById('keywords').value.trim();
@@ -1140,261 +1144,442 @@ async function runPipeline() {
   if (!keywords) { alert('Podaj frazy kluczowe.'); nav('brief'); return; }
 
   pipelineRunning = true;
-  runStartTime = Date.now();
+  pipelineAborted = false;
+  runStartTime    = Date.now();
   resetPipeline();
+
+  document.getElementById('pipeline-btns').style.display = 'flex';
+  document.getElementById('abort-btn').style.display = 'inline-flex';
+  document.getElementById('retry-btn').style.display  = 'none';
+  document.getElementById('status-bar').classList.add('on');
 
   const settings  = getSettings();
   const site      = selectedSite;
   const cms       = site.cms;
 
-  // Pola briefu
-  const length        = document.getElementById('length').value;
-  const tone          = document.getElementById('tone').value;
-  const audience      = document.getElementById('audience').value.trim();
-  const link_pairs    = document.getElementById('link_pairs').value.trim();
-  const extra_info    = document.getElementById('extra_info').value.trim();
-  const meta_title_in = document.getElementById('meta_title_input').value.trim();
-  const meta_desc_in  = document.getElementById('meta_desc_input').value.trim();
-  const tags          = document.getElementById('tags').value.trim() || site.tags || '';
-  const categories    = document.getElementById('categories').value.trim() || site.categories || '';
-  const post_slug     = document.getElementById('post_slug').value.trim();
-  const scheduled_at  = document.getElementById('scheduled_at').value || null;
-  const img1On        = document.getElementById('img1-toggle').checked;
-  const img2On        = document.getElementById('img2-toggle').checked;
-  const img1_prompt   = document.getElementById('img1_prompt').value.trim();
-  const img2_prompt   = document.getElementById('img2_prompt').value.trim();
-  const img1_alt      = document.getElementById('img1_alt').value.trim();
-  const img2_alt      = document.getElementById('img2_alt').value.trim();
-  const img_title     = document.getElementById('img_title').value.trim();
+  // ── Zbierz dane z briefu ──────────────────────────────────────────────────
+  const length       = document.getElementById('length').value;
+  const tone         = document.getElementById('tone').value;
+  const audience     = document.getElementById('audience').value.trim();
+  const link_pairs   = document.getElementById('link_pairs').value.trim();
+  const extra_info   = document.getElementById('extra_info').value.trim();
+  const meta_title_in= document.getElementById('meta_title_input').value.trim();
+  const meta_desc_in = document.getElementById('meta_desc_input').value.trim();
+  const tags         = document.getElementById('tags').value.trim() || site.tags || '';
+  const categories   = document.getElementById('categories').value.trim() || site.categories || '';
+  const post_slug    = document.getElementById('post_slug').value.trim();
+  const scheduled_at = document.getElementById('scheduled_at').value || null;
+  const img1On       = document.getElementById('img1-toggle').checked;
+  const img2On       = document.getElementById('img2-toggle').checked;
+  // AUTO-PROMPT: jeśli puste – generuj z tematu i fraz
+  const mainKw       = keywords.split(',')[0].trim();
+  const img1_prompt  = document.getElementById('img1_prompt').value.trim()  || `Profesjonalne zdjęcie do artykułu o temacie: ${topic}`;
+  const img2_prompt  = document.getElementById('img2_prompt').value.trim()  || document.getElementById('img1_prompt').value.trim() || `Zdjęcie śródtekstowe do artykułu: ${topic}`;
+  const img1_alt     = document.getElementById('img1_alt').value.trim()     || meta_title_in || topic;
+  const img2_alt     = document.getElementById('img2_alt').value.trim()     || img1_alt;
+  const img_title    = document.getElementById('img_title').value.trim()    || mainKw.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  const status_val   = scheduled_at ? 'future' : (site.default_status || 'draft');
 
-  const status_val = scheduled_at ? 'future' : (site.default_status || 'draft');
+  const apiBase = {
+    api_provider: settings.api_provider || 'gemini',
+    api_model:    settings.api_model || ''
+  };
 
-  document.getElementById('status-bar').classList.add('on');
-  document.getElementById('status-text').textContent = 'Trwa przetwarzanie...';
+  // Stan pipeline'u
+  let research = '', article = '', metaTitle = '', metaDesc = '', postId = null, postLink = '';
+  const targetChars   = parseInt(length) || 3000;
+  const minAcceptable = targetChars * 0.6;
+
   document.getElementById('run-site-info').textContent = `${site.name} · ${cms.toUpperCase()} · ${site.url}`;
 
-  const apiBase = { api_provider: settings.api_provider || 'gemini', api_model: settings.api_model || '' };
-  let research = '', article = '', meta = {}, postId = null, postLink = '';
-
   // ── 1. RESEARCH ──────────────────────────────────────────────────────────
-  setStep('research', 'running', 'Zbieram dane o temacie...');
+  setStep('research', 'running', 'Analizuję temat...');
+  setStatus('Krok 1/7 – Research');
   try {
-    const r = await fetch('/api/research', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+    const r = await callApi('research', {
       ...apiBase, topic, keywords, audience, extra_info,
-      researchprompt: settings.researchprompt || ''
-    })});
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    research = d.result;
-    setStep('research', 'done', 'Research gotowy');
-    setOut('research', research);
+      researchprompt: getMasterprompt('research')
+    });
+    research = r.result || '';
+    setStep('research', 'done', 'Research zakończony');
+    setOut('research', research.substring(0, 500) + (research.length > 500 ? '…' : ''));
   } catch(e) {
-    setStep('research', 'error', 'Błąd: ' + e.message);
-    return finishPipeline(false, e.message, topic, keywords, site);
+    if (isAbort(e)) return endPipeline();
+    setStep('research', 'error', e.message);
+    return endPipeline(false, e.message, {topic, keywords, site, article, metaTitle});
   }
 
-  // ── 2. WRITE ─────────────────────────────────────────────────────────────
-  setStep('write', 'running', 'Piszę artykuł (' + length + ' zzs)...');
-  try {
-    const r = await fetch('/api/write', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-      ...apiBase, topic, keywords, length, tone, audience, link_pairs, extra_info, research,
-      masterprompt: settings.masterprompt || ''
-    })});
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    article = d.result;
-    const charCount = article.replace(/<[^>]+>/g,'').length;
-    setStep('write', 'done', `Artykuł gotowy (${charCount.toLocaleString()} zzs)`);
-    setOut('write', article.replace(/<[^>]+>/g,'').substring(0, 300) + '...');
-  } catch(e) {
-    setStep('write', 'error', 'Błąd: ' + e.message);
-    return finishPipeline(false, e.message, topic, keywords, site);
+  checkAbort();
+
+  // ── 2. WRITE (auto-retry do 3 razy jeśli za krótki) ─────────────────────
+  setStep('write', 'running', 'Piszę artykuł...');
+  setStatus('Krok 2/7 – Pisanie tekstu');
+  let writeOk = false;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      if (attempt > 1) setStep('write', 'running', `Próba ${attempt}/3 – artykuł za krótki, piszę ponownie...`);
+      const r = await callApi('write', {
+        ...apiBase, topic, keywords, length, tone, audience,
+        link_pairs, extra_info, research,
+        masterprompt: getMasterprompt('write')
+      });
+      article = cleanHtml(r.result || '');
+      const chars = article.replace(/<[^>]+>/g,' ').trim().length;
+      if (chars >= minAcceptable) {
+        setStep('write', 'done', `Artykuł napisany (${chars.toLocaleString()} zzs)`);
+        setOut('write', article.replace(/<[^>]+>/g,' ').substring(0,400) + '…');
+        writeOk = true; break;
+      }
+      if (attempt < 3) { await delay(2000); continue; }
+      if (chars > 1000) {
+        setStep('write', 'done', `Artykuł napisany (${chars.toLocaleString()} zzs – krótszy niż cel)`);
+        setOut('write', article.replace(/<[^>]+>/g,' ').substring(0,400) + '…');
+        writeOk = true;
+      } else {
+        setStep('write', 'error', `Artykuł za krótki po 3 próbach. Zmień model lub spróbuj później.`);
+        return endPipeline(false, 'Artykuł za krótki', {topic, keywords, site, article, metaTitle});
+      }
+    } catch(e) {
+      if (isAbort(e)) return endPipeline();
+      if (attempt < 3) { await delay(2000); continue; }
+      if (article.length > 500) {
+        setStep('write', 'done', `Artykuł z poprzedniej próby (błąd: ${e.message})`);
+        writeOk = true;
+      } else {
+        setStep('write', 'error', 'Błąd pisania: ' + e.message);
+        return endPipeline(false, e.message, {topic, keywords, site, article, metaTitle});
+      }
+    }
   }
 
-  // ── 3. PROOFREAD ─────────────────────────────────────────────────────────
-  setStep('proofread', 'running', 'Sprawdzam tekst...');
+  checkAbort();
+
+  // ── 3. SEO ───────────────────────────────────────────────────────────────
+  setStep('seo', 'running', 'Optymalizacja SEO...');
+  setStatus('Krok 3/7 – SEO');
   try {
-    const r = await fetch('/api/proofread', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-      ...apiBase, article, keywords
-    })});
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    article = d.result;
-    setStep('proofread', 'done', d.skipped ? `Pominięto korektę (${d.reason})` : 'Korekta zakończona');
+    const r = await callApi('seo', {
+      ...apiBase, article, topic,
+      main_keyword: mainKw
+    });
+    const d = r.result || {};
+    article    = d.corrected_article || article;
+    metaTitle  = meta_title_in || d.meta_title || topic;
+    metaDesc   = meta_desc_in  || d.meta_description || '';
+    setStep('seo', 'done', `Meta title gotowy`);
+    setOut('seo', `📌 ${metaTitle}\n📝 ${metaDesc}\n\n${d.seo_notes||''}`);
+    showSeoQuality(article, mainKw);
   } catch(e) {
-    setStep('proofread', 'skip', 'Pominięto (błąd: ' + e.message + ')');
+    if (isAbort(e)) return endPipeline();
+    setStep('seo', 'error', e.message);
+    metaTitle = meta_title_in || topic.substring(0,60);
+    metaDesc  = meta_desc_in  || '';
   }
 
-  // ── 4. SEO ───────────────────────────────────────────────────────────────
-  setStep('seo', 'running', 'Generuję meta dane...');
-  try {
-    const r = await fetch('/api/seo', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-      ...apiBase, article, topic, main_keyword: keywords.split(',')[0].trim()
-    })});
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    meta = d.result;
-    // Nadpisz jeśli użytkownik wpisał ręcznie
-    if (meta_title_in) meta.meta_title = meta_title_in;
-    if (meta_desc_in)  meta.meta_description = meta_desc_in;
-    setStep('seo', 'done', 'Meta dane gotowe');
-    setOut('seo', `Title: ${meta.meta_title}\nDesc: ${meta.meta_description}`);
-  } catch(e) {
-    setStep('seo', 'error', 'Błąd: ' + e.message);
-    meta = { meta_title: meta_title_in || topic.substring(0,60), meta_description: meta_desc_in || '' };
+  // Walidacja HTML przed publikacją
+  const val = validateHtml(article);
+  if (!val.ok) {
+    setStep('publish', 'error', `Wstrzymano: ${val.reason}`);
+    return endPipeline(false, val.reason, {topic, keywords, site, article, metaTitle});
   }
 
-  // ── 5. PUBLISH ───────────────────────────────────────────────────────────
-  setStep('publish', 'running', `Publikuję na ${cms.toUpperCase()}...`);
+  checkAbort();
+
+  // ── 4. PUBLIKACJA SZKICU ─────────────────────────────────────────────────
+  setStep('publish', 'running', `Publikuję szkic na ${cms.toUpperCase()}...`);
+  setStatus('Krok 4/7 – Publikacja szkicu');
   try {
-    const r = await fetch('/api/publish', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-      cms,
-      site_url:   site.url,
-      site_login: site.login,
-      site_pass:  site.password_enc,
-      title:      topic,
-      brief_topic: topic,
-      content:    article,
-      status:     status_val,
-      excerpt:    article.replace(/<[^>]+>/g,'').substring(0, 150),
-      meta_title: meta.meta_title || '',
-      meta_desc:  meta.meta_description || '',
-      tags, categories, post_slug, scheduled_at
-    })});
-    const d = await r.json();
-    if (d.error) throw new Error(d.error);
-    postId   = d.id;
-    postLink = d.link || '';
-    setStep('publish', 'done', `Opublikowano (ID: ${postId})`);
+    const r = await callApi('publish', {
+      cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
+      title: topic, brief_topic: topic, content: article,
+      status: 'draft', excerpt: metaDesc,
+      meta_title: metaTitle, meta_desc: metaDesc,
+      tags, categories, post_slug
+    });
+    postId   = r.id;
+    postLink = r.link || '';
+    setStep('publish', 'done', `Szkic zapisany! ID: ${postId}`);
   } catch(e) {
+    if (isAbort(e)) return endPipeline();
     setStep('publish', 'error', 'Błąd: ' + e.message);
-    return finishPipeline(false, e.message, topic, keywords, site, meta);
+    return endPipeline(false, e.message, {topic, keywords, site, article, metaTitle});
   }
 
-  // ── 6. ZDJĘCIE 1 ─────────────────────────────────────────────────────────
-  if (img1On && img1_prompt) {
+  checkAbort();
+
+  // ── 5. KOREKTA JĘZYKOWA ──────────────────────────────────────────────────
+  setStep('proofread', 'running', 'Korekta językowa...');
+  setStatus('Krok 5/7 – Korekta językowa');
+  await delay(500);
+
+  const origPCount  = (article.match(/<p[^>]*>/gi) || []).length;
+  const origH2Count = (article.match(/<h2[^>]*>/gi) || []).length;
+  const origLinks   = [...article.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi)].map(m => ({
+    href: m[1], anchor: m[2].replace(/<[^>]+>/g,'').trim().toLowerCase(),
+    nofollow: m[0].includes('nofollow')
+  }));
+
+  try {
+    const rp = await callApi('proofread', { ...apiBase, article, keywords });
+    let proof = cleanHtml(rp.result || '');
+
+    const lenOk  = proof.length >= article.length * 0.8;
+    const pOk    = Math.abs((proof.match(/<p[^>]*>/gi)||[]).length - origPCount) <= 2;
+    const h2Ok   = (proof.match(/<h2[^>]*>/gi)||[]).length >= origH2Count - 1;
+
+    // Przywróć brakujące linki
+    let linksFixed = 0;
+    for (const lnk of origLinks) {
+      if (!proof.includes(lnk.href)) {
+        const re = new RegExp(lnk.anchor.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i');
+        const rel = lnk.nofollow ? ' rel="nofollow"' : '';
+        proof = proof.replace(re, `<a href="${lnk.href}"${rel}>${lnk.anchor}</a>`);
+        linksFixed++;
+      }
+    }
+
+    if (lenOk && pOk && h2Ok) {
+      article = proof;
+      const warns = linksFixed > 0 ? ` – przywrócono ${linksFixed} link(i)` : '';
+      setStep('proofread', 'done', `Korekta zakończona${warns}`);
+      // Zaktualizuj szkic po korekcie
+      try { await callApi('update_post', { cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc, post_id: postId, content: article, title: topic, status: 'draft' }); }
+      catch(eu) { console.warn('update_post po korekcie:', eu.message); }
+    } else {
+      const why = [!lenOk && 'za krótki', !pOk && 'zmiana akapitów', !h2Ok && 'brak nagłówków'].filter(Boolean).join(', ');
+      setStep('proofread', 'done', `Użyto oryginału (${why})`);
+    }
+  } catch(e) {
+    if (isAbort(e)) return endPipeline();
+    setStep('proofread', 'error', `Błąd korekty: ${e.message} (kontynuuję)`);
+  }
+
+  checkAbort();
+
+  // ── 6. ZDJĘCIE WYRÓŻNIONE ────────────────────────────────────────────────
+  setStatus('Krok 6/7 – Zdjęcia');
+  if (img1On) {
     setStep('img1', 'running', 'Generuję zdjęcie wyróżnione...');
-    try {
-      const r = await fetch('/api/images', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-        cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
-        post_id: postId, image_num: 1,
-        prompt1: img1_prompt, alt1: img1_alt || topic, img_title
-      })});
-      const d = await r.json();
-      if (d.error) throw new Error(d.error);
-      if (d.image_url) {
-        document.getElementById('img1-preview').innerHTML = `<img src="${d.image_url}" alt="featured">`;
+    let img1ok = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        if (attempt > 1) { setStep('img1','running',`Zdjęcie wyróżnione – próba ${attempt}/3...`); await delay(3000); }
+        const r = await callApi('images', {
+          cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
+          post_id: postId, image_num: 1,
+          prompt1: img1_prompt, alt1: img1_alt,
+          img_title: img_title + '-featured'
+        });
+        if (!r.image_url) throw new Error('Brak URL');
+        document.getElementById('img1-preview').innerHTML = `<img src="${r.image_url}" alt="featured">`;
+        setStep('img1', 'done', `Zdjęcie dodane${r.compressed?' (skompresowane)':''}`);
+        img1ok = true; break;
+      } catch(e) {
+        if (attempt === 3) setStep('img1', 'error', 'Błąd: ' + e.message);
       }
-      setStep('img1', 'done', `Zdjęcie dodane${d.compressed ? ' (skompresowane)' : ''}`);
-    } catch(e) {
-      setStep('img1', 'error', 'Błąd: ' + e.message);
     }
+    if (!img1ok) setStep('img1', 'error', 'Nie udało się wygenerować zdjęcia po 3 próbach');
   } else {
-    setStep('img1', 'skip', img1On ? 'Brak promptu – pominięto' : 'Pominięto');
+    setStep('img1', 'skip', 'Pominięto');
   }
 
-  // ── 7. ZDJĘCIE 2 ─────────────────────────────────────────────────────────
-  if (img2On && img2_prompt) {
-    setStep('img2', 'running', 'Generuję zdjęcie śródtekstowe...');
+  checkAbort();
+
+  // ── 7. FINALIZACJA – zmień status na docelowy ────────────────────────────
+  setStatus('Krok 7/7 – Finalizacja');
+  setStep('img2', 'running', 'Finalizuję wpis...');
+  await delay(300);
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const r = await fetch('/api/images', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      await callApi('update_post', {
         cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
-        post_id: postId, image_num: 2,
-        prompt1: img1_prompt, prompt2: img2_prompt,
-        alt1: img1_alt || topic, alt2: img2_alt || topic, img_title
-      })});
-      const d = await r.json();
-      if (d.error) throw new Error(d.error);
-      if (d.image_url) {
-        document.getElementById('img2-preview').innerHTML = `<img src="${d.image_url}" alt="srodtekstowe">`;
-      }
-      setStep('img2', 'done', `Zdjęcie dodane${d.compressed ? ' (skompresowane)' : ''}`);
+        post_id: postId, content: article, title: topic,
+        status: status_val,
+        ...(scheduled_at ? {} : {})
+      });
+      break;
     } catch(e) {
-      setStep('img2', 'error', 'Błąd: ' + e.message);
+      if (isAbort(e)) return endPipeline();
+      if (attempt < 3) await delay(2000);
+      else console.warn('Finalizacja status:', e.message);
+    }
+  }
+
+  // ── 8. ZDJĘCIE ŚRÓDTEKSTOWE (po finalizacji) ─────────────────────────────
+  if (img2On) {
+    setStep('img2', 'running', 'Generuję zdjęcie śródtekstowe...');
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        if (attempt > 1) { setStep('img2','running',`Zdjęcie śródtekstowe – próba ${attempt}/3...`); await delay(3000); }
+        const r = await callApi('images', {
+          cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
+          post_id: postId, image_num: 2,
+          prompt1: img1_prompt, prompt2: img2_prompt,
+          alt1: img1_alt, alt2: img2_alt,
+          img_title: img_title + '-srodtekstowe'
+        });
+        if (!r.image_url) throw new Error('Brak URL');
+        document.getElementById('img2-preview').innerHTML = `<img src="${r.image_url}" alt="srodtekstowe">`;
+        setStep('img2', 'done', `Zdjęcie dodane${r.compressed?' (skompresowane)':''}`);
+        break;
+      } catch(e) {
+        if (attempt === 3) setStep('img2', 'error', 'Błąd: ' + e.message);
+      }
     }
   } else {
-    setStep('img2', 'skip', img2On ? 'Brak promptu – pominięto' : 'Pominięto');
+    setStep('img2', 'skip', 'Pominięto');
   }
 
   // ── SUKCES ────────────────────────────────────────────────────────────────
-  finishPipeline(true, '', topic, keywords, site, meta, postId, postLink, article);
+  endPipeline(true, '', {topic, keywords, site, article, metaTitle, metaDesc, postId, postLink, scheduled_at});
 }
 
-async function finishPipeline(success, errMsg, topic, keywords, site, meta, postId, postLink, article) {
+// ─── Wywołanie API ──────────────────────────────────────────────────────────
+async function callApi(endpoint, body) {
+  const r = await fetch(`/api/${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const d = await r.json();
+  if (d.error) throw new Error(d.error);
+  return d;
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function isAbort(e) { return e?.message === '__ABORTED__'; }
+
+function isOverloadError(msg) {
+  if (!msg) return false;
+  const m = msg.toLowerCase();
+  return m.includes('overload') || m.includes('high demand') || m.includes('503') ||
+         m.includes('529') || m.includes('capacity') || m.includes('unavailable') ||
+         m.includes('przeciążon') || m.includes('try again later');
+}
+
+function validateHtml(text) {
+  if (!text?.trim()) return { ok: false, reason: 'Pusty artykuł' };
+  if (!text.includes('<')) return { ok: false, reason: 'Brak tagów HTML' };
+  if (!/<p[^>]*>/i.test(text) && !/<h[2-6][^>]*>/i.test(text))
+    return { ok: false, reason: 'Brak akapitów ani nagłówków' };
+  return { ok: true };
+}
+
+function cleanHtml(text) {
+  if (!text) return text;
+  text = text.trim()
+    .replace(/^```html\s*/i,'').replace(/^```\s*/i,'').replace(/\s*```$/i,'').trim();
+  text = text.replace(/\*\*([^*]+?)\*\*/g,'<strong>$1</strong>');
+  text = text.replace(/\*([^*]+?)\*/g,'<em>$1</em>');
+  text = text.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+  text = text.replace(/^## (.+)$/gm,'<h2>$1</h2>');
+  text = text.replace(/^# (.+)$/gm,'<h2>$1</h2>');
+  // Usuń komentarz przed pierwszym tagiem
+  const ft = text.indexOf('<');
+  if (ft > 0 && ft < 500) text = text.substring(ft);
+  const lt = text.lastIndexOf('>');
+  if (lt > 0 && lt < text.length - 1) {
+    const after = text.substring(lt+1).trim();
+    if (after.length > 0 && !after.startsWith('<')) text = text.substring(0, lt+1);
+  }
+  // Usuń puste akapity i boldowane frazy kluczowe jako osobne akapity
+  text = text.replace(/<p[^>]*>\s*<\/p>/gi,'');
+  text = text.replace(/<p[^>]*>\s*<strong>([^<]{1,60})<\/strong>\s*<\/p>/gi,'');
+  return text.trim();
+}
+
+function showSeoQuality(html, mainKw) {
+  // Prosta ocena SEO w konsoli – nie blokuje pipeline
+  const text = html.replace(/<[^>]+>/g,' ').toLowerCase();
+  const kw   = (mainKw||'').toLowerCase().trim();
+  const h2   = (html.match(/<h2[^>]*>/gi)||[]).length;
+  const h3   = (html.match(/<h3[^>]*>/gi)||[]).length;
+  const inH2 = kw ? html.toLowerCase().includes(kw) : false;
+  console.log(`SEO check – H2: ${h2}, H3: ${h3}, kw in text: ${text.includes(kw)}, kw in H2: ${inH2}`);
+}
+
+function getMasterprompt(type) {
+  const key = type === 'research' ? 'mdmt_researchprompt' : 'mdmt_masterprompt';
+  const stored = JSON.parse(localStorage.getItem('mdmt_settings') || '{}');
+  if (type === 'research') return stored.researchprompt || '';
+  return stored.masterprompt || '';
+}
+
+function setStatus(msg) {
+  document.getElementById('status-text').textContent = msg;
+}
+
+async function endPipeline(success, errMsg, ctx) {
   pipelineRunning = false;
   const duration = Date.now() - runStartTime;
-  const settings = getSettings();
-  const charCount = article ? article.replace(/<[^>]+>/g,'').length : 0;
-  const status = success ? (document.getElementById('scheduled_at').value ? 'draft' : 'published') : 'error';
-
   document.getElementById('status-bar').classList.remove('on');
+  document.getElementById('abort-btn').style.display = 'none';
+  document.getElementById('retry-btn').style.display = 'inline-flex';
+
+  if (!ctx) return; // przerwano
+
+  const { topic, keywords, site, article, metaTitle, metaDesc, postId, postLink, scheduled_at } = ctx;
+  const charCount = article ? article.replace(/<[^>]+>/g,'').length : 0;
+  const settings  = getSettings();
+  const status    = success ? (scheduled_at ? 'draft' : 'published') : 'error';
 
   if (success) {
     const box = document.getElementById('result-box');
     box.classList.add('on');
-    const scheduled_at = document.getElementById('scheduled_at').value;
     document.getElementById('result-meta').innerHTML = `
       <strong>Blog:</strong> ${esc(site.name)} (${site.cms.toUpperCase()})<br>
       <strong>Temat:</strong> ${esc(topic)}<br>
-      <strong>Meta title:</strong> ${esc(meta?.meta_title || '—')}<br>
+      <strong>Meta title:</strong> ${esc(metaTitle||'—')}<br>
       <strong>Czas:</strong> ${Math.round(duration/1000)}s
-      ${scheduled_at ? `<br><strong>Zaplanowano na:</strong> ${new Date(scheduled_at).toLocaleString('pl-PL')}` : ''}
+      ${scheduled_at ? `<br><strong>Zaplanowano:</strong> ${new Date(scheduled_at).toLocaleString('pl-PL')}` : ''}
     `;
-    const link = document.getElementById('result-link');
-    if (postLink) { link.href = postLink; link.style.display = 'inline-flex'; }
-    else link.style.display = 'none';
+    const lnk = document.getElementById('result-link');
+    if (postLink) { lnk.href = postLink; lnk.style.display = 'inline-flex'; }
+    else lnk.style.display = 'none';
   }
 
   await saveToHistory({
-    topic, keywords: keywords || '',
+    topic, keywords: keywords||'',
     site_id: site.id, site_name: site.name, site_url: site.url, cms: site.cms,
     model_used: settings.api_provider || 'gemini',
     char_count: charCount, status,
-    post_url: postLink || '', post_id: postId ? String(postId) : '',
-    error_message: errMsg || '',
-    duration_ms: duration,
-    scheduled_at: document.getElementById('scheduled_at').value || null
+    post_url: postLink||'', post_id: postId ? String(postId) : '',
+    error_message: errMsg||'', duration_ms: duration,
+    scheduled_at: scheduled_at || null
   });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// HELPERS
+// PIPELINE CONTROL
 // ═══════════════════════════════════════════════════════════════════════════
-function countChars(inputId, countId) {
-  const len = document.getElementById(inputId).value.length;
-  const el  = document.getElementById(countId);
-  if (!el) return;
-  el.textContent = len > 0 ? len + ' znaków' : '0 znaków';
+function checkAbort() {
+  if (pipelineAborted) throw new Error('__ABORTED__');
 }
 
-function checkLengthWarn() {
-  const len = parseInt(document.getElementById('length').value);
-  const settings = getSettings();
-  const isClaude = (settings.api_provider || 'gemini').includes('claude');
-  document.getElementById('length-warn').style.display = (len >= 5000 && isClaude) ? 'block' : 'none';
-}
-
-function toggleEye(inputId, btn) {
-  const el = document.getElementById(inputId);
-  if (!el) return;
-  el.type = el.type === 'password' ? 'text' : 'password';
-  btn.textContent = el.type === 'password' ? '👁' : '🙈';
-}
-
-function clearBrief() {
-  if (!confirm('Wyczyścić wszystkie pola briefu?')) return;
-  ['topic','keywords','audience','link_pairs','extra_info','meta_title_input','meta_desc_input',
-   'tags','categories','post_slug','img1_prompt','img2_prompt','img1_alt','img2_alt','img_title','scheduled_at'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
+function abortPipeline() {
+  pipelineAborted = true;
+  pipelineRunning = false;
+  document.getElementById('abort-btn').style.display = 'none';
+  document.getElementById('retry-btn').style.display = 'inline-flex';
+  document.getElementById('status-bar').classList.remove('on');
+  ['research','write','proofread','seo','img1','publish','img2'].forEach(id => {
+    const msg = document.getElementById('msg-' + id);
+    const step = document.getElementById('step-' + id);
+    if (step && !step.classList.contains('done') && !step.classList.contains('error')) {
+      step.className = 'step error';
+      if (msg) msg.textContent = 'Przerwano';
+    }
   });
-  document.getElementById('length').value = '4000';
-  document.getElementById('tone').value = 'przyjazny i naturalny';
-  document.getElementById('topic-count').textContent = '0 znaków';
 }
 
-function esc(str) {
-  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function retryPipeline() {
+  if (pipelineRunning) return;
+  document.getElementById('retry-btn').style.display = 'none';
+  document.getElementById('result-box').classList.remove('on');
+  runPipeline();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
