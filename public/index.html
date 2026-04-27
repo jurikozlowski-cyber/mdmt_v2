@@ -1071,7 +1071,7 @@ function exportSitesCSV() {
     s.name, s.url, s.cms, s.login, s.password_enc,
     s.tags || '', s.categories || '', s.default_status || 'draft', s.notes || ''
   ]));
-  const csv = rows.map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const csv = rows.map(r => r.map(v => `\"${String(v||'').replace(/\"/g,'\"\"')}\"`).join(',')).join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1807,8 +1807,7 @@ async function handleQueueCSV(input) {
   if (!file) return;
   try {
     const text = await file.text();
-    const lines = text.replace(//g,'').split('
-').filter(l => l.trim());
+    const lines = text.replace(/\r/g,'').split('\n').filter(l => l.trim());
     if (lines.length < 2) return alert('Plik CSV jest pusty lub zawiera tylko nagłówek.');
     const headers = parseCSVLine(lines[0]);
     const col = name => headers.indexOf(name);
@@ -1852,15 +1851,12 @@ async function handleQueueCSV(input) {
 function downloadQueueTemplate() {
   const header = 'topic,keywords,site_name,length,tone,scheduled_at,img1_prompt,audience,extra_info';
   const example = '"Jak wybrać buty trailowe","buty trailowe,trail running","Górski Biegacz","4000","przyjazny i naturalny","","","biegacze górscy",""';
-  const blob = new Blob(['﻿' + header + '
-' + example], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob(['\uFEFF' + header + '\n' + example], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'mdmt-kolejka-szablon.csv';
   a.click();
 }
-
-// ─── Dodaj ręcznie ─────────────────────────────────────────────────────────
 function addQueueJobManual() {
   // Wypełnij select witryn
   const sel = document.getElementById('qm-site');
@@ -2213,9 +2209,8 @@ function exportQueueReport() {
     j.status, j.post_url||'', j.error_msg||'',
     j.duration_ms ? Math.round(j.duration_ms/1000) : ''
   ]));
-  const csv = rows.map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('
-');
-  const blob = new Blob(['﻿'+csv], { type: 'text/csv;charset=utf-8' });
+  const csv = rows.map(r => r.map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'mdmt-raport-kolejki-' + new Date().toISOString().slice(0,10) + '.csv';
