@@ -464,9 +464,9 @@ input[type="datetime-local"] { color-scheme: dark; }
 
   <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
     <button class="btn btn-primary btn-sm" onclick="toggleAddPanel()">+ Dodaj witrynę</button>
-    <button class="btn btn-ghost btn-sm" onclick="importSitesJSON()">📥 Importuj JSON</button>
-    <button class="btn btn-ghost btn-sm" onclick="exportSitesJSON()">📤 Eksportuj JSON</button>
-    <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImportFile(this)">
+    <button class="btn btn-ghost btn-sm" onclick="importSitesCSV()">📥 Importuj CSV</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportSitesCSV()">📤 Eksportuj CSV</button>
+    <input type="file" id="import-file" accept=".csv" style="display:none" onchange="handleImportFile(this)">
   </div>
 
   <!-- ADD SITE FORM -->
@@ -888,20 +888,21 @@ async function deleteSite(id) {
   await loadSites();
 }
 
-function exportSitesJSON() {
-  const data = allSites.map(s => ({
-    name: s.name, url: s.url, cms: s.cms, login: s.login,
-    password: s.password_enc, tags: s.tags, categories: s.categories,
-    default_status: s.default_status, notes: s.notes
-  }));
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+function exportSitesCSV() {
+  const rows = [['name','url','cms','login','password','tags','categories','default_status','notes']];
+  allSites.forEach(s => rows.push([
+    s.name, s.url, s.cms, s.login, s.password_enc,
+    s.tags || '', s.categories || '', s.default_status || 'draft', s.notes || ''
+  ]));
+  const csv = rows.map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'mdmt-blogi-' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = 'mdmt-blogi-' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
 }
 
-function importSitesJSON() {
+function importSitesCSV() {
   document.getElementById('import-file').click();
 }
 
@@ -910,24 +911,68 @@ async function handleImportFile(input) {
   if (!file) return;
   try {
     const text = await file.text();
-    const data = JSON.parse(text);
-    if (!Array.isArray(data)) return alert('Nieprawidłowy format – oczekiwana tablica JSON.');
-    let ok = 0, err = 0;
-    for (const s of data) {
-      if (!s.name || !s.url || !s.password) { err++; continue; }
+    const lines = text.replace(/\r/g,'').split('\n').filter(l => l.trim());
+    if (lines.length < 2) return alert('Plik CSV jest pusty lub zawiera tylko nagłówek.');
+
+    // Parsuj nagłówek
+    const headers = parseCSVLine(lines[0]);
+    const col = name => headers.indexOf(name);
+
+    // Sprawdź wymagane kolumny
+    if (col('name') === -1 || col('url') === -1 || col('password') === -1) {
+      return alert('Brak wymaganych kolumn: name, url, password.\n\nPobierz szablon przez "Eksportuj CSV" z istniejącymi wierszami lub utwórz plik z nagłówkiem:\nname,url,cms,login,password,tags,categories,default_status,notes');
+    }
+
+    let ok = 0, err = 0, skipped = 0;
+    for (let i = 1; i < lines.length; i++) {
+      const vals = parseCSVLine(lines[i]);
+      if (!vals.length || vals.every(v => !v.trim())) { skipped++; continue; }
+      const name     = vals[col('name')]     || '';
+      const url      = vals[col('url')]      || '';
+      const password = vals[col('password')] || '';
+      if (!name || !url || !password) { err++; continue; }
+      const payload = {
+        name, url,
+        cms:            col('cms') > -1            ? (vals[col('cms')] || 'wordpress') : 'wordpress',
+        login:          col('login') > -1          ? (vals[col('login')] || '') : '',
+        password,
+        tags:           col('tags') > -1           ? (vals[col('tags')] || '') : '',
+        categories:     col('categories') > -1     ? (vals[col('categories')] || '') : '',
+        default_status: col('default_status') > -1 ? (vals[col('default_status')] || 'draft') : 'draft',
+        notes:          col('notes') > -1          ? (vals[col('notes')] || '') : ''
+      };
       const r = await fetch('/api/sites', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ name:s.name, url:s.url, cms:s.cms||'wordpress', login:s.login||'', password:s.password, tags:s.tags||'', categories:s.categories||'', default_status:s.default_status||'draft', notes:s.notes||'' })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
       const d = await r.json();
       d.error ? err++ : ok++;
     }
     await loadSites();
-    alert(`Import zakończony. Dodano: ${ok}, błędów: ${err}.`);
+    alert(`Import zakończony.\n✅ Dodano: ${ok}\n❌ Błędów: ${err}${skipped ? `\n⏭ Pominięto pustych wierszy: ${skipped}` : ''}`);
   } catch(e) {
     alert('Błąd importu: ' + e.message);
   }
   input.value = '';
+}
+
+// Parser CSV obsługujący cudzysłowy i przecinki w polach
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (ch === ',' && !inQ) {
+      result.push(cur.trim()); cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  result.push(cur.trim());
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
