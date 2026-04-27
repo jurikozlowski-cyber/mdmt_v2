@@ -1,6 +1,6 @@
 // api/history.js – zapis i odczyt historii publikacji w Supabase
 
-const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+import { createClient } from '@supabase/supabase-js';
 
 function getSupabase() {
   return createClient(
@@ -32,20 +32,9 @@ export default async function handler(req, res) {
     // POST – zapisz wynik publikacji
     if (method === 'POST') {
       const {
-        topic,
-        keywords,
-        site_id,
-        site_name,
-        site_url,
-        cms,
-        model_used,
-        char_count,
-        status,
-        post_url,
-        post_id,
-        error_message,
-        duration_ms,
-        scheduled_at
+        topic, keywords, site_id, site_name, site_url, cms,
+        model_used, char_count, status, post_url, post_id,
+        error_message, duration_ms, scheduled_at
       } = req.body;
 
       if (!topic || !site_name || !status) {

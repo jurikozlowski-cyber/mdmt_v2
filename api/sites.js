@@ -1,6 +1,6 @@
 // api/sites.js – CRUD witryn w Supabase
 
-const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+import { createClient } from '@supabase/supabase-js';
 
 function getSupabase() {
   return createClient(
@@ -31,16 +31,16 @@ export default async function handler(req, res) {
     // POST – dodaj witrynę
     if (method === 'POST') {
       const { name, url, cms, login, password, tags, categories, default_status, notes } = req.body;
-      if (!name || !url || !cms || !login || !password) {
-        return res.status(400).json({ error: 'Brak wymaganych pól: name, url, cms, login, password' });
+      if (!name || !url || !password) {
+        return res.status(400).json({ error: 'Brak wymaganych pól: name, url, password' });
       }
       const { data, error } = await supabase
         .from('sites')
         .insert([{
           name,
           url: url.replace(/\/$/, ''),
-          cms,
-          login,
+          cms: cms || 'wordpress',
+          login: login || '',
           password_enc: password,
           tags: tags || '',
           categories: categories || '',
@@ -60,8 +60,8 @@ export default async function handler(req, res) {
       const updates = {
         name,
         url: url?.replace(/\/$/, ''),
-        cms,
-        login,
+        cms: cms || 'wordpress',
+        login: login || '',
         tags: tags || '',
         categories: categories || '',
         default_status: default_status || 'draft',
