@@ -651,18 +651,29 @@ async function doLogin() {
   try {
     const r = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password:pwd}) });
     const d = await r.json();
-    if (d.ok || d.disabled) { showApp(); }
-    else { document.getElementById('login-err').style.display='block'; btn.textContent='Zaloguj →'; btn.disabled=false; }
+    if (d.ok || d.disabled) {
+      localStorage.setItem('mdmt_pwd', pwd);
+      showApp();
+    } else {
+      document.getElementById('login-err').style.display='block';
+      btn.textContent='Zaloguj →'; btn.disabled=false;
+    }
   } catch(e) { btn.textContent='Zaloguj →'; btn.disabled=false; }
 }
 
-function checkSession() {
-  const hasCookie = document.cookie.includes('ab_session=');
-  if (hasCookie) { showApp(); }
-  else {
-    fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:'__check__'})})
-      .then(r=>r.json()).then(d=>{ if(d.disabled) showApp(); }).catch(()=>{});
+async function checkSession() {
+  if (document.cookie.includes('ab_session=')) { showApp(); return; }
+  const savedPwd = localStorage.getItem('mdmt_pwd');
+  if (savedPwd) {
+    try {
+      const r = await fetch('/api/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: savedPwd}) });
+      const d = await r.json();
+      if (d.ok || d.disabled) { showApp(); return; }
+      else { localStorage.removeItem('mdmt_pwd'); }
+    } catch(e) {}
   }
+  fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:'__check__'})})
+    .then(r=>r.json()).then(d=>{ if(d.disabled) showApp(); }).catch(()=>{});
 }
 
 function showApp() {
