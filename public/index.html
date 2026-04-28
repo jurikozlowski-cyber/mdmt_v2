@@ -1356,8 +1356,8 @@ async function runPipeline() {
   setStep('research', 'running', 'Analizuję temat...');
   setStatus('Krok 1/7 – Research');
   try {
-    const r = await callApi('research', {
-      ...apiBase, topic, keywords, audience, extra_info,
+    const r = await callWithFallback('research', {
+      topic, keywords, audience, extra_info,
       researchprompt: getMasterprompt('research')
     });
     research = r.result || '';
@@ -1378,8 +1378,8 @@ async function runPipeline() {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       if (attempt > 1) setStep('write', 'running', `Próba ${attempt}/3 – artykuł za krótki, piszę ponownie...`);
-      const r = await callApi('write', {
-        ...apiBase, topic, keywords, length, tone, audience,
+      const r = await callWithFallback('write', {
+        topic, keywords, length, tone, audience,
         link_pairs, extra_info, research,
         masterprompt: getMasterprompt('write')
       });
@@ -1418,8 +1418,8 @@ async function runPipeline() {
   setStep('seo', 'running', 'Optymalizacja SEO...');
   setStatus('Krok 3/7 – SEO');
   try {
-    const r = await callApi('seo', {
-      ...apiBase, article, topic,
+    const r = await callWithFallback('seo', {
+      article, topic,
       main_keyword: mainKw
     });
     const d = r.result || {};
@@ -1480,7 +1480,7 @@ async function runPipeline() {
   }));
 
   try {
-    const rp = await callApi('proofread', { ...apiBase, article, keywords });
+    const rp = await callWithFallback('proofread', { article, keywords });
     let proof = cleanHtml(rp.result || '');
 
     const lenOk  = proof.length >= article.length * 0.8;
