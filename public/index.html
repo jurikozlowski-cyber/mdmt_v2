@@ -660,6 +660,7 @@ input[type="datetime-local"] { color-scheme: dark; }
     <button class="btn btn-primary btn-sm" onclick="startQueue()" id="q-start-btn">▶ Start kolejki</button>
     <button class="btn btn-ghost btn-sm" onclick="stopQueue()" id="q-stop-btn" style="display:none;color:var(--danger);border-color:var(--danger)">⏹ Zatrzymaj</button>
     <button class="btn btn-ghost btn-sm" onclick="importQueueCSV()">📥 Importuj CSV</button>
+    <button class="btn btn-ghost btn-sm" onclick="importQueueSheets()">📊 Importuj Google Sheets</button>
     <button class="btn btn-ghost btn-sm" onclick="downloadQueueTemplate()">📄 Szablon CSV</button>
     <button class="btn btn-ghost btn-sm" onclick="addQueueJobManual()">+ Dodaj ręcznie</button>
     <button class="btn btn-ghost btn-sm" onclick="clearQueue()" style="color:var(--muted)">🗑 Wyczyść</button>
@@ -792,6 +793,40 @@ input[type="datetime-local"] { color-scheme: dark; }
   </div>
 </div>
 
+
+<!-- ═══ GOOGLE SHEETS MODAL ═══════════════════════════════════════════════ -->
+<div id="sheets-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:520px;margin:20px">
+    <div class="card-title" style="margin-bottom:18px">📊 Import z Google Sheets</div>
+
+    <div class="notice notice-info" style="margin-bottom:16px">
+      Arkusz musi być udostępniony jako <strong>„Każdy z linkiem może wyświetlać"</strong>.<br>
+      Pierwszy wiersz = nagłówki: <code>topic, keywords, site_name, length, tone, scheduled_at, img1_prompt, audience, extra_info</code>
+    </div>
+
+    <div class="field" style="margin-bottom:14px">
+      <label>URL lub ID arkusza Google Sheets *</label>
+      <input id="sheets-url" type="text" placeholder="https://docs.google.com/spreadsheets/d/...">
+    </div>
+
+    <div class="field" style="margin-bottom:14px">
+      <label>Nazwa zakładki (opcjonalnie – puste = pierwsza zakładka)</label>
+      <input id="sheets-tab" type="text" placeholder="np. Kolejka, Sheet1">
+    </div>
+
+    <div id="sheets-result" style="display:none;margin-bottom:14px">
+      <div class="notice notice-ok" id="sheets-ok-msg"></div>
+      <div style="margin-top:10px" id="sheets-tab-list"></div>
+    </div>
+
+    <div id="sheets-error" style="display:none" class="notice" style="background:rgba(255,79,79,0.08);border:1px solid rgba(255,79,79,0.3);color:var(--danger)"></div>
+
+    <div class="btn-row" style="margin-top:8px">
+      <button class="btn btn-primary btn-sm" id="sheets-fetch-btn" onclick="fetchSheets()">📥 Pobierz dane</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeSheetsModal()">Anuluj</button>
+    </div>
+  </div>
+</div>
 </main>
 </div><!-- /app -->
 
@@ -1066,10 +1101,12 @@ async function deleteSite(id) {
 }
 
 function exportSitesCSV() {
-  const rows = [['name','url','cms','login','password','tags','categories','default_status','notes']];
+  // Eksport bez haseł – bezpieczniejszy plik do udostępniania
+  const rows = [['name','url','cms','login','tags','categories','default_status','notes','password']];
   allSites.forEach(s => rows.push([
-    s.name, s.url, s.cms, s.login, s.password_enc,
-    s.tags || '', s.categories || '', s.default_status || 'draft', s.notes || ''
+    s.name, s.url, s.cms, s.login,
+    s.tags || '', s.categories || '', s.default_status || 'draft', s.notes || '',
+    '*** WYPEŁNIJ HASŁO ***'
   ]));
   const csv = rows.map(r => r.map(v => `\"${String(v||'').replace(/\"/g,'\"\"')}\"`).join(',')).join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
@@ -1716,6 +1753,122 @@ function esc(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GOOGLE SHEETS IMPORT
+// ═══════════════════════════════════════════════════════════════════════════
+
+function importQueueSheets() {
+  document.getElementById('sheets-url').value = '';
+  document.getElementById('sheets-tab').value = '';
+  document.getElementById('sheets-result').style.display = 'none';
+  document.getElementById('sheets-error').style.display  = 'none';
+  const modal = document.getElementById('sheets-modal');
+  modal.style.display = 'flex';
+}
+
+function closeSheetsModal() {
+  document.getElementById('sheets-modal').style.display = 'none';
+}
+
+async function fetchSheets() {
+  const url = document.getElementById('sheets-url').value.trim();
+  const tab = document.getElementById('sheets-tab').value.trim();
+  if (!url) return alert('Wklej URL arkusza Google Sheets.');
+
+  const btn = document.getElementById('sheets-fetch-btn');
+  btn.textContent = 'Pobieranie...'; btn.disabled = true;
+  document.getElementById('sheets-result').style.display = 'none';
+  document.getElementById('sheets-error').style.display  = 'none';
+
+  try {
+    const r = await fetch('/api/sheets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sheet_url: url, sheet_name: tab })
+    });
+    const d = await r.json();
+
+    if (d.error) {
+      const errEl = document.getElementById('sheets-error');
+      errEl.textContent = d.error;
+      errEl.style.display = 'block';
+      if (d.available_columns) {
+        errEl.textContent += '\n\nDostępne kolumny: ' + d.available_columns.join(', ');
+      }
+      btn.textContent = '📥 Pobierz dane'; btn.disabled = false;
+      return;
+    }
+
+    // Pokaż wynik
+    const resEl = document.getElementById('sheets-result');
+    resEl.style.display = 'block';
+    document.getElementById('sheets-ok-msg').innerHTML =
+      `✅ Znaleziono <strong>${d.total}</strong> artykułów w zakładce <strong>${esc(d.used_sheet)}</strong>`;
+
+    // Pokaż dostępne zakładki jeśli jest więcej niż jedna
+    const tabEl = document.getElementById('sheets-tab-list');
+    if (d.sheets_available && d.sheets_available.length > 1) {
+      tabEl.innerHTML = '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Inne zakładki w arkuszu:</div>' +
+        d.sheets_available.map(s => s === d.used_sheet
+          ? `<span class="badge badge-ok" style="margin-right:6px">${esc(s)} ✓</span>`
+          : `<button class="btn btn-ghost btn-sm" style="margin-right:6px;margin-bottom:6px" onclick="document.getElementById('sheets-tab').value='${esc(s)}';fetchSheets()">${esc(s)}</button>`
+        ).join('');
+    } else {
+      tabEl.innerHTML = '';
+    }
+
+    // Dodaj do kolejki
+    if (d.total === 0) {
+      document.getElementById('sheets-error').textContent = 'Arkusz nie zawiera żadnych wierszy z danymi (poza nagłówkiem).';
+      document.getElementById('sheets-error').style.display = 'block';
+      btn.textContent = '📥 Pobierz dane'; btn.disabled = false;
+      return;
+    }
+
+    let added = 0, skipped = 0;
+    for (const rec of d.records) {
+      const site = allSites.find(s => s.name.toLowerCase() === (rec.site_name||'').toLowerCase()) || allSites[0];
+      if (!site) { skipped++; continue; }
+      queueJobs.push({
+        id:           'job_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+        topic:        rec.topic,
+        keywords:     rec.keywords     || '',
+        site_id:      site.id,
+        site_name:    site.name,
+        length:       rec.length       || '4000',
+        tone:         rec.tone         || 'przyjazny i naturalny',
+        scheduled_at: rec.scheduled_at || '',
+        img_prompt:   rec.img1_prompt  || '',
+        audience:     rec.audience     || '',
+        extra:        rec.extra_info   || '',
+        status:       'pending',
+        post_url:     '',
+        error_msg:    ''
+      });
+      added++;
+    }
+
+    renderQueue();
+    nav('queue');
+    closeSheetsModal();
+    alert('Import z Google Sheets zakończony.\n✅ Dodano do kolejki: ' + added + (skipped ? '\n\u26a0\ufe0f Pominięto (brak witryny): ' + skipped : ''));
+
+  } catch(e) {
+    const errEl = document.getElementById('sheets-error');
+    errEl.textContent = 'Błąd połączenia: ' + e.message;
+    errEl.style.display = 'block';
+  }
+
+  btn.textContent = '📥 Pobierz dane'; btn.disabled = false;
+}
+
+// Zamknij modal kliknięciem w tło
+document.addEventListener('click', function(e) {
+  const modal = document.getElementById('sheets-modal');
+  if (modal && e.target === modal) closeSheetsModal();
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // KOLEJKA
