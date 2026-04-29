@@ -1076,8 +1076,8 @@ function onNsCmsChange() {
     hint.innerHTML = '<div class="cms-hint">Joomla: wejdź w <strong>System → API Tokens</strong>, utwórz nowy token i wklej go w pole powyżej. Login nie jest używany do autoryzacji.</div>';
   } else if (cms === 'drupal') {
     loginLabel.textContent = 'Login Drupal *';
-    passLabel.textContent  = 'Hasło Drupal * (wymaga modułu basic_auth)';
-    hint.innerHTML = '<div class="cms-hint">Drupal: upewnij się że moduł <strong>HTTP Basic Authentication</strong> jest włączony (<em>Admin → Extend</em>). Użytkownik musi mieć rolę z uprawnieniem tworzenia artykułów.</div>';
+    passLabel.textContent  = 'Hasło Drupal *';
+    hint.innerHTML = '<div class="cms-hint"><strong>Drupal 8/9/10:</strong> włącz moduł <strong>HTTP Basic Authentication</strong> i <strong>JSON:API</strong> w Rozszerzenia.<br><strong>Drupal 7:</strong> zainstaluj moduł <strong>Services</strong> + <strong>REST Server</strong>, utwórz endpoint o ścieżce <code>api</code> z zasobami <code>node (create)</code> i <code>user (login/logout)</code>.<br>Wersja jest wykrywana automatycznie.</div>';
   } else {
     loginLabel.textContent = 'Login WordPress *';
     passLabel.textContent  = 'App Password * (WP → Użytkownicy → Profil → Hasła aplikacji)';
