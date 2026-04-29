@@ -2321,7 +2321,7 @@ function downloadQueueTemplate() {
 function addQueueJobManual() {
   // Wypełnij select witryn
   const sel = document.getElementById('qm-site');
-  sel.innerHTML = allSites.map(s => `<option value="${s.id}">${esc(s.name)} (${s.cms.toUpperCase()})</option>`).join('');
+  sel.innerHTML = allSites.map(s => `<option value="${s.id}">${esc(s.url)} (${s.cms.toUpperCase()})</option>`).join('');
   document.getElementById('q-manual-panel').classList.add('open');
 }
 
