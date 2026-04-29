@@ -2536,8 +2536,8 @@ async function startQueue() {
           site_login: site.login, site_pass: site.password_enc,
           title: job.topic, brief_topic: job.topic,
           content: article, status: 'draft',
-          meta_title: metaTitle,
-          tags: site.tags || '', categories: site.categories || '',
+          meta_title: metaTitle, meta_desc: metaDesc,
+          post_slug: job.post_slug || '',
           scheduled_at: job.scheduled_at || null
         })
       }).then(r => r.json());
