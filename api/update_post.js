@@ -110,7 +110,7 @@ export default async function handler(req, res) {
         headers: d7Headers,
         body: JSON.stringify({
           title,
-          body: [{ value: content, format: 'full_html' }],
+          body: { und: [{ value: content, format: 'filtered_html' }] },
           status: status === 'publish' ? 1 : 0
         })
       });

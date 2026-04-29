@@ -158,7 +158,7 @@ async function uploadToJoomla(imgData, mimeType, altTxt, filename, baseUrl, toke
   return { id: fname, url: fileUrl };
 }
 
-// ─── Upload Drupal ────────────────────────────────────────────────────────────
+// ─── Upload Drupal (auto-detect D7 vs D8+) ───────────────────────────────────
 
 async function uploadToDrupal(imgData, mimeType, altTxt, filename, baseUrl, login, pass) {
   const creds  = Buffer.from(`${login}:${pass}`).toString('base64');
@@ -166,29 +166,64 @@ async function uploadToDrupal(imgData, mimeType, altTxt, filename, baseUrl, logi
   const ext    = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png';
   const fname  = `${filename}.${ext}`;
 
-  // Krok 1: upload pliku przez JSON:API file upload endpoint
-  const fileRes  = await fetch(`${baseUrl}/jsonapi/node/article/field_image`, {
+  // Sprawdź czy to D8+ przez jsonapi
+  const d8check = await fetch(`${baseUrl}/jsonapi`, {
+    headers: { 'Authorization': `Basic ${creds}`, 'Accept': 'application/vnd.api+json' },
+    signal: AbortSignal.timeout(5000)
+  }).catch(() => ({ ok: false }));
+
+  if (d8check.ok) {
+    // ── Drupal 8+ JSON:API file upload ────────────────────────────────
+    const fileRes = await fetch(`${baseUrl}/jsonapi/node/article/field_image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${creds}`,
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `file; filename="${fname}"`,
+        'Accept': 'application/vnd.api+json'
+      },
+      body: buffer
+    });
+    const fileText = await fileRes.text();
+    let fileData;
+    try { fileData = JSON.parse(fileText); } catch { throw new Error(`[DODAWANIE DRUPAL] Bład: ${fileText.substring(0,200)}`); }
+    if (fileData.errors) throw new Error(fileData.errors.map(e => e.title||e.detail).join(', '));
+    const fileId  = fileData.data?.id;
+    const fileUrl = fileData.data?.attributes?.uri?.url ? `${baseUrl}${fileData.data.attributes.uri.url}` : null;
+    return { id: fileId, url: fileUrl };
+  }
+
+  // ── Drupal 7 Services – file.create (base64) ─────────────────────────
+  const loginRes  = await fetch(`${baseUrl}/api/user/login.json`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Basic ${creds}`,
-      'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `file; filename="${fname}"`,
-      'Accept': 'application/vnd.api+json'
-    },
-    body: buffer
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ username: login, password: pass })
   });
-  const fileText = await fileRes.text();
-  let fileData;
-  try { fileData = JSON.parse(fileText); } catch { throw new Error(`[DODAWANIE DRUPAL] Błąd pliku: ${fileText.substring(0, 200)}`); }
-  if (fileData.errors) throw new Error(fileData.errors.map(e => e.title || e.detail).join(', '));
+  const loginData = await loginRes.json();
+  if (!loginData.sessid) throw new Error(`[DODAWANIE DRUPAL 7] Błąd logowania: ${loginData.message || 'błędne dane'}`);
 
-  const fileId  = fileData.data?.id;
-  const fileUrl = fileData.data?.attributes?.uri?.url
-    ? `${baseUrl}${fileData.data.attributes.uri.url}`
-    : null;
+  const d7H = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Cookie': `${loginData.session_name}=${loginData.sessid}`,
+    'X-CSRF-Token': loginData.token || ''
+  };
 
-  return { id: fileId, url: fileUrl };
+  const fileRes7 = await fetch(`${baseUrl}/api/file.json`, {
+    method: 'POST',
+    headers: d7H,
+    body: JSON.stringify({ filename: fname, file: imgData, filepath: `public://${fname}` })
+  });
+  const fileText7 = await fileRes7.text();
+  let fileData7;
+  try { fileData7 = JSON.parse(fileText7); } catch { throw new Error(`[DODAWANIE DRUPAL 7] Błąd pliku: ${fileText7.substring(0,200)}`); }
+
+  try { await fetch(`${baseUrl}/api/user/logout.json`, { method: 'POST', headers: d7H }); } catch(e) {}
+
+  if (!fileData7.fid) throw new Error(`[DODAWANIE DRUPAL 7] Brak fid: ${fileText7.substring(0,200)}`);
+  return { id: fileData7.fid, url: `${baseUrl}/sites/default/files/${fname}` };
 }
+
 
 // ─── Handler główny ───────────────────────────────────────────────────────────
 
