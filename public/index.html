@@ -2626,10 +2626,7 @@ async function startQueue() {
 
       // 7. FINALIZACJA – zmień status na docelowy
       qStep('finalize', 'running'); qMsg('Finalizuję...');
-      // Waliduj datę – zły format traktujemy jak brak daty
-      const validDate   = job.scheduled_at && !isNaN(new Date(job.scheduled_at).getTime());
-      const finalStatus = validDate ? 'future' : (site.default_status || 'draft');
-      const safeScheduled = validDate ? job.scheduled_at : null;
+      // status i data już obliczone na początku (safeScheduled, finalStatus, validDate)
       await fetch('/api/update_post', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cms: site.cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc, post_id: postId, content: article, title: job.topic, status: finalStatus })
