@@ -2469,8 +2469,11 @@ async function startQueue() {
     document.getElementById('q-live-title').textContent = `[${i+1}/${queueJobs.length}] ${job.topic}`;
     qResetSteps();
 
-    const started = Date.now();
-    let postUrl = '', postId = null, article = '', metaTitle = job.topic;
+    const started       = Date.now();
+    const validDate     = job.scheduled_at && !isNaN(new Date(job.scheduled_at).getTime());
+    const safeScheduled = validDate ? job.scheduled_at : null;
+    const finalStatus   = safeScheduled ? 'future' : (site.default_status || 'draft');
+    let postUrl = '', postId = null, article = '', metaTitle = job.topic, metaDesc = '';
 
     try {
       // 1. RESEARCH
@@ -2626,7 +2629,7 @@ async function startQueue() {
 
       // 7. FINALIZACJA – zmień status na docelowy
       qStep('finalize', 'running'); qMsg('Finalizuję...');
-      // status i data już obliczone na początku (safeScheduled, finalStatus, validDate)
+
       await fetch('/api/update_post', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cms: site.cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc, post_id: postId, content: article, title: job.topic, status: finalStatus })
