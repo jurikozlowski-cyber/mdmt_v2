@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     const col = name => headers.indexOf(name);
 
     // Sprawdź wymagane kolumny
-    if (col('topic') === -1 && col('temat') === -1) {
+    if (colMap.topic === -1) {
       return res.status(400).json({
         error: 'Brak kolumny "topic" lub "temat" w pierwszym wierszu arkusza.',
         available_columns: headers,
@@ -67,23 +67,23 @@ export default async function handler(req, res) {
       });
     }
 
-    // Mapowanie polskich nazw kolumn na angielskie
+    // Mapowanie – polskie nazwy mają priorytet
     const colMap = {
-      topic:        col('topic') > -1        ? col('topic')        : col('temat'),
-      keywords:     col('keywords') > -1     ? col('keywords')     : col('frazy'),
-      site_name:    col('site_name') > -1    ? col('site_name')    : col('blog'),
-      length:       col('length') > -1       ? col('length')       : col('długość'),
-      tone:         col('tone') > -1         ? col('tone')         : col('styl'),
-      scheduled_at: col('scheduled_at') > -1 ? col('scheduled_at') : col('data'),
-      img1_prompt:  col('img1_prompt') > -1  ? col('img1_prompt')  : col('zdjecie'),
-      img2_prompt:  col('img2_prompt') > -1  ? col('img2_prompt')  : -1,
-      link_pairs:   col('link_pairs') > -1   ? col('link_pairs')   : col('linki'),
-      meta_title:   col('meta_title') > -1   ? col('meta_title')   : -1,
-      meta_desc:    col('meta_desc') > -1    ? col('meta_desc')    : -1,
-      slug:         col('slug') > -1         ? col('slug')         : -1,
-      photos:       col('photos') > -1       ? col('photos')       : -1,
-      audience:     col('audience') > -1     ? col('audience')     : col('odbiorcy'),
-      extra_info:   col('extra_info') > -1   ? col('extra_info')   : col('wytyczne'),
+      topic:        col('temat')     > -1 ? col('temat')     : col('topic'),
+      keywords:     col('frazy')     > -1 ? col('frazy')     : col('keywords'),
+      site_name:    col('blog')      > -1 ? col('blog')      : col('site_name'),
+      length:       col('długość')   > -1 ? col('długość')   : col('length'),
+      tone:         col('styl')      > -1 ? col('styl')      : col('tone'),
+      scheduled_at: col('data')      > -1 ? col('data')      : col('scheduled_at'),
+      img1_prompt:  col('zdjecie')   > -1 ? col('zdjecie')   : col('img1_prompt'),
+      img2_prompt:  col('zdjecie2')  > -1 ? col('zdjecie2')  : col('img2_prompt'),
+      link_pairs:   col('linki')     > -1 ? col('linki')     : col('link_pairs'),
+      meta_title:   col('meta_title')> -1 ? col('meta_title'): -1,
+      meta_desc:    col('meta_desc') > -1 ? col('meta_desc') : -1,
+      slug:         col('slug')      > -1 ? col('slug')      : -1,
+      photos:       col('zdjecia')   > -1 ? col('zdjecia')   : col('photos'),
+      audience:     col('odbiorcy')  > -1 ? col('odbiorcy')  : col('audience'),
+      extra_info:   col('wytyczne')  > -1 ? col('wytyczne')  : col('extra_info'),
     };
 
     // Parsuj wiersze danych

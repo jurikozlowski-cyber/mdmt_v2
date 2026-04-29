@@ -263,7 +263,7 @@ input[type="datetime-local"] { color-scheme: dark; }
     <div class="grid">
       <div class="field col2">
         <label>Temat / tytuł artykułu *</label>
-        <input id="topic" type="text" placeholder="np. Jak wybrać buty do biegania w górach?" oninput="countChars('topic','topic-count')">
+        <input id="topic" type="text" placeholder="Tytuł artykułu" oninput="countChars('topic','topic-count')">
         <div class="char-count" id="topic-count">0 znaków</div>
       </div>
       <div class="field">
@@ -287,7 +287,7 @@ input[type="datetime-local"] { color-scheme: dark; }
       </div>
       <div class="field col2">
         <label>Grupa docelowa</label>
-        <input id="audience" type="text" placeholder="np. Początkujący biegacze górscy, 25–45 lat">
+        <input id="audience" type="text" placeholder="Opisz grupę docelową czytelników">
       </div>
     </div>
   </div>
@@ -298,12 +298,12 @@ input[type="datetime-local"] { color-scheme: dark; }
     <div class="grid">
       <div class="field col2">
         <label>Frazy kluczowe (oddziel przecinkami) *</label>
-        <input id="keywords" type="text" placeholder="np. buty do biegania w górach, trail running, buty trailowe">
+        <input id="keywords" type="text" placeholder="fraza główna, fraza pomocnicza, fraza długiego ogona">
         <div class="hint-text">Pierwsza fraza = główna. Wskazówka: używaj naturalnej formy: <strong>podróż do Norwegii</strong> zamiast <strong>Norwegia podróż</strong></div>
       </div>
       <div class="field col2">
         <label>Linkowanie – anchor | URL (każda para w osobnej linii)</label>
-        <textarea id="link_pairs" style="min-height:100px;font-family:monospace;font-size:13px" placeholder="tekst anchora | https://twoja-strona.pl/artykul&#10;inna fraza | https://zewnetrzna.pl/strona | nofollow"></textarea>
+        <textarea id="link_pairs" style="min-height:100px;font-family:monospace;font-size:13px" placeholder="anchor tekstu | https://adres.pl&#10;drugi anchor | https://adres2.pl | nofollow&#10;(pary rozdzielone nową linią; w CSV/Sheets użyj ;; zamiast nowej linii)"></textarea>
         <div class="hint-text">Format: <strong>anchor | URL</strong> lub <strong>anchor | URL | nofollow</strong></div>
       </div>
     </div>
@@ -323,6 +323,10 @@ input[type="datetime-local"] { color-scheme: dark; }
         <textarea id="meta_desc_input" style="min-height:70px" maxlength="170" placeholder="Zostaw puste – agent wygeneruje automatycznie" oninput="countChars('meta_desc_input','md-count')"></textarea>
         <div class="char-count" id="md-count">0/155</div>
       </div>
+      <div class="field col2">
+        <label>Slug URL (opcjonalnie – zostaw puste = auto z meta title)</label>
+        <input id="post_slug" type="text" placeholder="adres-url-artykulu">
+      </div>
     </div>
   </div>
 
@@ -338,15 +342,15 @@ input[type="datetime-local"] { color-scheme: dark; }
       </div>
       <div class="field col2">
         <label>Prompt zdjęcia wyróżnionego</label>
-        <input id="img1_prompt" type="text" placeholder="np. Profesjonalne buty trailowe na górskim szlaku, złota godzina">
+        <input id="img1_prompt" type="text" placeholder="Opisz scenę, styl, nastrój zdjęcia wyróżnionego">
       </div>
       <div class="field">
         <label>Alt text zdjęcia 1</label>
-        <input id="img1_alt" type="text" placeholder="np. Buty do biegania w górach na szlaku">
+        <input id="img1_alt" type="text" placeholder="Zostaw puste = fraza główna – temat (auto)">
       </div>
       <div class="field">
         <label>Tytuł zdjęcia (SEO)</label>
-        <input id="img_title" type="text" placeholder="np. buty-trailowe-gory">
+        <input id="img_title" type="text" placeholder="tytul-zdjecia-seo">
       </div>
       <div class="field col2" style="margin-top:8px">
         <div class="toggle-row">
@@ -356,11 +360,11 @@ input[type="datetime-local"] { color-scheme: dark; }
       </div>
       <div class="field col2">
         <label>Prompt zdjęcia śródtekstowego</label>
-        <input id="img2_prompt" type="text" placeholder="np. Zbliżenie na podeszwę buta trailowego, detal techniczny">
+        <input id="img2_prompt" type="text" placeholder="Opisz scenę zdjęcia śródtekstowego">
       </div>
       <div class="field">
         <label>Alt text zdjęcia 2</label>
-        <input id="img2_alt" type="text" placeholder="np. Podeszwa buta do biegania w terenie">
+        <input id="img2_alt" type="text" placeholder="Zostaw puste = fraza drugorzędna – temat (auto)">
       </div>
     </div>
   </div>
@@ -370,12 +374,8 @@ input[type="datetime-local"] { color-scheme: dark; }
     <div class="card-title">Dodatkowe wytyczne</div>
     <div class="grid full">
       <div class="field">
-        <label>Slug URL (opcjonalnie)</label>
-        <input id="post_slug" type="text" placeholder="np. buty-do-biegania-w-gorach – zostaw puste = auto">
-      </div>
-      <div class="field">
         <label>Dodatkowe wytyczne dla pisarza</label>
-        <textarea id="extra_info" placeholder="np. Wspomnij o testach laboratoryjnych, unikaj nazw konkurencji, dodaj przykłady z życia"></textarea>
+        <textarea id="extra_info" placeholder="Dodatkowe wskazówki dla pisarza, rzeczy do uwzględnienia lub pominięcia"></textarea>
       </div>
     </div>
   </div>
@@ -496,7 +496,7 @@ input[type="datetime-local"] { color-scheme: dark; }
     <div class="site-grid">
       <div class="field col2">
         <label>Nazwa witryny *</label>
-        <input id="ns-name" type="text" placeholder="np. Blog techniczny">
+        <input id="ns-name" type="text" placeholder="Nazwa witryny">
       </div>
       <div class="field col2">
         <label>URL witryny * (bez trailing slash)</label>
@@ -531,11 +531,11 @@ input[type="datetime-local"] { color-scheme: dark; }
       <div class="field col2" id="ns-cms-hint"></div>
       <div class="field">
         <label>Tagi domyślne (przecinkami)</label>
-        <input id="ns-tags" type="text" placeholder="np. tech, AI">
+        <input id="ns-tags" type="text" placeholder="tag1, tag2">
       </div>
       <div class="field">
         <label>Kategorie domyślne (ID lub nazwy)</label>
-        <input id="ns-categories" type="text" placeholder="np. 1,3 lub Technologia">
+        <input id="ns-categories" type="text" placeholder="ID lub nazwa kategorii">
       </div>
       <div class="field col2">
         <label>Notatki (widoczne tylko tutaj)</label>
@@ -595,6 +595,7 @@ input[type="datetime-local"] { color-scheme: dark; }
           <th>Znaki</th>
           <th>Status</th>
           <th>Link</th>
+          <th></th>
         </tr>
       </thead>
       <tbody id="hist-tbody">
@@ -721,11 +722,11 @@ input[type="datetime-local"] { color-scheme: dark; }
     <div class="site-grid">
       <div class="field col2">
         <label>Temat artykułu *</label>
-        <input id="qm-topic" type="text" placeholder="np. Jak wybrać buty do biegania w górach?">
+        <input id="qm-topic" type="text" placeholder="Tytuł artykułu">
       </div>
       <div class="field col2">
         <label>Frazy kluczowe (przecinkami) *</label>
-        <input id="qm-keywords" type="text" placeholder="np. buty trailowe, trail running">
+        <input id="qm-keywords" type="text" placeholder="fraza główna, fraza pomocnicza">
       </div>
       <div class="field">
         <label>Witryna docelowa *</label>
@@ -759,7 +760,7 @@ input[type="datetime-local"] { color-scheme: dark; }
       </div>
       <div class="field col2">
         <label>Linkowanie – anchor | URL (każda para w osobnej linii)</label>
-        <textarea id="qm-links" style="min-height:70px;font-family:monospace;font-size:12px" placeholder="tekst anchora | https://twoja-strona.pl&#10;fraza | https://link.pl | nofollow"></textarea>
+        <textarea id="qm-links" style="min-height:70px;font-family:monospace;font-size:12px" placeholder="anchor | https://adres.pl ;; drugi anchor | https://adres2.pl | nofollow"></textarea>
       </div>
       <div class="field col2">
         <label>Prompt zdjęcia śródtekstowego (opcjonalnie)</label>
@@ -837,20 +838,13 @@ input[type="datetime-local"] { color-scheme: dark; }
 
     <div class="notice notice-info" style="margin-bottom:16px">
       Arkusz musi być udostępniony jako <strong>„Każdy z linkiem może wyświetlać"</strong>.<br>
-      Pierwszy wiersz = nagłówki (angielskie lub polskie):<br>
-      <code>topic</code> / <code>temat</code> &nbsp;·&nbsp;
-      <code>keywords</code> / <code>frazy</code> &nbsp;·&nbsp;
-      <code>site_name</code> / <code>blog</code> (URL witryny)<br>
-      <code>length</code> / <code>długość</code> &nbsp;·&nbsp;
-      <code>tone</code> / <code>styl</code> &nbsp;·&nbsp;
-      <code>scheduled_at</code> / <code>data</code><br>
-      <code>img1_prompt</code> / <code>zdjecie</code> &nbsp;·&nbsp;
-      <code>img2_prompt</code> &nbsp;·&nbsp;
-      <code>link_pairs</code> / <code>linki</code><br>
-      <code>meta_title</code> &nbsp;·&nbsp; <code>meta_desc</code> &nbsp;·&nbsp;
-      <code>slug</code> &nbsp;·&nbsp;
-      <code>audience</code> / <code>odbiorcy</code> &nbsp;·&nbsp;
-      <code>extra_info</code> / <code>wytyczne</code>
+      Pierwszy wiersz to nagłówki – używaj polskich nazw kolumn:<br><br>
+      <code>blog</code> &nbsp;·&nbsp; <code>temat</code> &nbsp;·&nbsp; <code>frazy</code> &nbsp;·&nbsp; <code>długość</code> &nbsp;·&nbsp; <code>linki</code><br>
+      <code>zdjecia</code> (liczba: 0/1/2) &nbsp;·&nbsp; <code>zdjecie</code> &nbsp;·&nbsp; <code>zdjecie2</code><br>
+      <code>meta_title</code> &nbsp;·&nbsp; <code>meta_desc</code> &nbsp;·&nbsp; <code>slug</code> &nbsp;·&nbsp; <code>data</code><br>
+      <code>wytyczne</code> &nbsp;·&nbsp; <code>styl</code> &nbsp;·&nbsp; <code>odbiorcy</code><br><br>
+      <strong>Linkowanie</strong> – wiele linków w jednej komórce, oddzielone <code>;;</code>:<br>
+      <code>anchor | https://adres.pl ;; drugi anchor | https://adres2.pl | nofollow</code>
     </div>
 
     <div class="field" style="margin-bottom:14px">
@@ -1298,8 +1292,25 @@ function renderHistory(data) {
       <td style="color:var(--muted)">${p.char_count ? p.char_count.toLocaleString() : '—'}</td>
       <td><span class="badge ${badge}">${statusLabel}</span>${p.error_message ? `<div class="hist-err-msg" title="${esc(p.error_message)}">${esc(p.error_message)}</div>` : ''}</td>
       <td>${p.post_url ? `<a href="${esc(p.post_url)}" target="_blank" class="hist-link">🔗 Otwórz</a>` : '—'}</td>
+      <td><button class="icon-btn del" onclick="deleteHistoryEntry('${p.id}')" title="Usuń wpis">🗑</button></td>
     </tr>`;
   }).join('');
+}
+
+async function deleteHistoryEntry(id) {
+  if (!confirm('Usunąć ten wpis z historii?')) return;
+  try {
+    const r = await fetch('/api/history', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    const d = await r.json();
+    if (d.error) return alert('Błąd: ' + d.error);
+    loadHistory();
+  } catch(e) {
+    alert('Błąd usuwania: ' + e.message);
+  }
 }
 
 function exportHistoryCSV() {
@@ -1475,7 +1486,11 @@ async function runPipeline() {
   const mainKw       = keywords.split(',')[0].trim();
   const img1_prompt  = document.getElementById('img1_prompt').value.trim()  || `Profesjonalne zdjęcie do artykułu o temacie: ${topic}`;
   const img2_prompt  = document.getElementById('img2_prompt').value.trim()  || document.getElementById('img1_prompt').value.trim() || `Zdjęcie śródtekstowe do artykułu: ${topic}`;
-  const img1_alt     = document.getElementById('img1_alt').value.trim()     || meta_title_in || topic;
+  const mainKwClean  = mainKw.replace(/x\d+$/i,'').trim();
+  const secondKw     = keywords.split(',').length > 1 ? keywords.split(',')[1].trim().replace(/x\d+$/i,'').trim() : mainKwClean;
+  const autoAlt1     = `${mainKwClean} – ${topic}`.substring(0, 100);
+  const autoAlt2     = `${secondKw} – ${topic}`.substring(0, 100);
+  const img1_alt     = document.getElementById('img1_alt').value.trim()     || autoAlt1;
   const img2_alt     = document.getElementById('img2_alt').value.trim()     || img1_alt;
   const img_title    = document.getElementById('img_title').value.trim()    || mainKw.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
   const status_val   = scheduled_at ? 'future' : (site.default_status || 'draft');
@@ -2210,38 +2225,55 @@ async function handleQueueCSV(input) {
     if (lines.length < 2) return alert('Plik CSV jest pusty lub zawiera tylko nagłówek.');
     const headers = parseCSVLine(lines[0]);
     const col = name => headers.indexOf(name);
-    if (col('topic') === -1) return alert('Brak kolumny "topic" w nagłówku CSV.');
+    // Mapowanie – polskie nazwy mają priorytet
+    const cm = {
+      topic:        col('temat')     > -1 ? col('temat')     : col('topic'),
+      keywords:     col('frazy')     > -1 ? col('frazy')     : col('keywords'),
+      site_name:    col('blog')      > -1 ? col('blog')      : col('site_name'),
+      length:       col('długość')   > -1 ? col('długość')   : col('length'),
+      tone:         col('styl')      > -1 ? col('styl')      : col('tone'),
+      scheduled_at: col('data')      > -1 ? col('data')      : col('scheduled_at'),
+      img1_prompt:  col('zdjecie')   > -1 ? col('zdjecie')   : col('img1_prompt'),
+      img2_prompt:  col('zdjecie2')  > -1 ? col('zdjecie2')  : col('img2_prompt'),
+      link_pairs:   col('linki')     > -1 ? col('linki')     : col('link_pairs'),
+      meta_title:   col('meta_title')> -1 ? col('meta_title'): -1,
+      meta_desc:    col('meta_desc') > -1 ? col('meta_desc') : -1,
+      slug:         col('slug')      > -1 ? col('slug')      : -1,
+      photos:       col('zdjecia')   > -1 ? col('zdjecia')   : col('photos'),
+      audience:     col('odbiorcy')  > -1 ? col('odbiorcy')  : col('audience'),
+      extra_info:   col('wytyczne')  > -1 ? col('wytyczne')  : col('extra_info'),
+    };
+    if (cm.topic === -1) return alert('Brak kolumny "temat" lub "topic" w nagłówku CSV.');
     let added = 0, skipped = 0;
     for (let i = 1; i < lines.length; i++) {
       const vals = parseCSVLine(lines[i]);
       if (!vals.length || vals.every(v => !v.trim())) { skipped++; continue; }
-      const topic = col('topic') > -1 ? vals[col('topic')] : '';
+      const g = ci => (ci > -1 && ci < vals.length) ? vals[ci].trim() : '';
+      const topic = g(cm.topic);
       if (!topic) { skipped++; continue; }
-      // Znajdź witrynę po nazwie
-      const siteName = col('site_name') > -1 ? vals[col('site_name')] : '';
+      const siteName = g(cm.site_name);
       const site = allSites.find(s => s.url === siteName || s.url.replace(/\/$/, '') === siteName.replace(/\/$/, ''))
                 || allSites.find(s => s.name.toLowerCase() === siteName.toLowerCase())
                 || allSites[0];
       if (!site) { skipped++; continue; }
-      const get = ci => (ci > -1 && ci < vals.length) ? vals[ci].trim() : '';
       queueJobs.push({
         id:           'job_' + Date.now() + '_' + i,
         topic,
-        keywords:     get(colMap.keywords),
+        keywords:     g(cm.keywords),
         site_id:      site.id,
         site_name:    site.name,
-        length:       get(colMap.length)       || '4000',
-        tone:         get(colMap.tone)         || 'przyjazny i naturalny',
-        scheduled_at: get(colMap.scheduled_at),
-        img_prompt:   get(colMap.img1_prompt),
-        img2_prompt:  get(colMap.img2_prompt),
-        link_pairs:   get(colMap.link_pairs),
-        meta_title:   get(colMap.meta_title),
-        meta_desc:    get(colMap.meta_desc),
-        post_slug:    get(colMap.slug),
-        photos:       parseInt(get(colMap.photos)) || 1,
-        audience:     get(colMap.audience),
-        extra:        get(colMap.extra_info),
+        length:       g(cm.length)       || '4000',
+        tone:         g(cm.tone)         || 'przyjazny i naturalny',
+        scheduled_at: g(cm.scheduled_at),
+        img_prompt:   g(cm.img1_prompt),
+        img2_prompt:  g(cm.img2_prompt),
+        link_pairs:   g(cm.link_pairs),
+        meta_title:   g(cm.meta_title),
+        meta_desc:    g(cm.meta_desc),
+        post_slug:    g(cm.slug),
+        photos:       parseInt(g(cm.photos)) || 1,
+        audience:     g(cm.audience),
+        extra:        g(cm.extra_info),
         status:       'pending',
         post_url:     '',
         error_msg:    ''
@@ -2258,8 +2290,8 @@ async function handleQueueCSV(input) {
 }
 
 function downloadQueueTemplate() {
-  const header = 'topic,keywords,site_name,length,tone,scheduled_at,img1_prompt,img2_prompt,link_pairs,meta_title,meta_desc,slug,photos,audience,extra_info';
-  const example = '"Jak wybrać buty trailowe","buty trailowe,trail running","https://gorskibiegacz.pl","4000","przyjazny i naturalny","","","","","","","",1,"biegacze górscy",""';
+  const header = 'blog,temat,frazy,długość,linki,zdjecia,zdjecie,zdjecie2,meta_title,meta_desc,slug,data,wytyczne,styl,odbiorcy';
+  const example = '"https://twojadomena.pl","Tytuł artykułu","fraza główna, fraza pomocnicza, fraza długiego ogona","4000","anchor tekst | https://link.pl ;; drugi anchor | https://link2.pl | nofollow","1","opis sceny do zdjęcia wyróżnionego","","","","","","","przyjazny i naturalny",""';
   const blob = new Blob(['\uFEFF' + header + '\n' + example], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2517,11 +2549,15 @@ async function startQueue() {
       if (queueStop) throw new Error('__QUEUE_STOPPED__');
 
       // 6. ZDJĘCIA
-      const qPhotos   = job.photos !== undefined ? parseInt(job.photos) : 1;
-      const mainKw    = (job.keywords.split(',')[0]||'').trim();
-      const imgSlug   = mainKw.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
-      const imgPrompt = job.img_prompt || `Profesjonalne zdjęcie do artykułu: ${job.topic}`;
-      const img2Prompt= job.img2_prompt || imgPrompt;
+      const qPhotos    = job.photos !== undefined ? parseInt(job.photos) : 1;
+      const mainKw     = (job.keywords.split(',')[0]||'').trim().replace(/x\d+$/i,'').trim();
+      const secondKw   = job.keywords.split(',').length > 1 ? job.keywords.split(',')[1].trim().replace(/x\d+$/i,'').trim() : mainKw;
+      const imgSlug    = mainKw.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+      const imgPrompt  = job.img_prompt  || `Profesjonalne zdjęcie do artykułu: ${job.topic}`;
+      const img2Prompt = job.img2_prompt || imgPrompt;
+      // SEO alts: fraza – temat (max 100 znaków)
+      const autoAlt1   = `${mainKw} – ${job.topic}`.substring(0, 100);
+      const autoAlt2   = `${secondKw} – ${job.topic}`.substring(0, 100);
 
       if (qPhotos > 0) {
         qStep('img1', 'running'); qMsg('Generuję zdjęcie wyróżnione...');
@@ -2532,7 +2568,7 @@ async function startQueue() {
               cms: site.cms, site_url: site.url,
               site_login: site.login, site_pass: site.password_enc,
               post_id: postId, image_num: 1,
-              prompt1: imgPrompt, alt1: metaTitle || job.topic,
+              prompt1: imgPrompt, alt1: autoAlt1,
               img_title: imgSlug + '-featured'
             })
           }).then(r => r.json());
@@ -2552,7 +2588,7 @@ async function startQueue() {
               site_login: site.login, site_pass: site.password_enc,
               post_id: postId, image_num: 2,
               prompt1: imgPrompt, prompt2: img2Prompt,
-              alt1: metaTitle || job.topic, alt2: metaTitle || job.topic,
+              alt1: autoAlt1, alt2: autoAlt2,
               img_title: imgSlug + '-srodtekstowe'
             })
           }).then(r => r.json());

@@ -51,7 +51,9 @@ export default async function handler(req, res) {
 
     let linksInstruction = 'brak';
     if (link_pairs.trim()) {
-      const pairs = link_pairs.split('\n')
+      // Obsługa separatora ;; (CSV/Sheets) oraz nowej linii (textarea)
+      const normalizedPairs = link_pairs.replace(/;;/g, '\n');
+      const pairs = normalizedPairs.split('\n')
         .map(l => l.trim()).filter(l => l.includes('|'))
         .map(l => {
           const idx = l.indexOf('|');
