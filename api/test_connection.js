@@ -58,9 +58,12 @@ export default async function handler(req, res) {
 
       // Sprawdź Drupal 7 przez Services
       try {
-        const r7 = await fetch(`${baseUrl}/api/user/login`, {
+        const r7 = await fetch(`${baseUrl}/api/user/login.json`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
           body: JSON.stringify({ username: site_login, password: site_pass }),
           signal: AbortSignal.timeout(8000)
         });
@@ -68,9 +71,13 @@ export default async function handler(req, res) {
         if (r7.ok && d7.sessid) {
           // Wyloguj od razu
           try {
-            await fetch(`${baseUrl}/api/user/logout`, {
+            await fetch(`${baseUrl}/api/user/logout.json`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Cookie': `${d7.session_name}=${d7.sessid}` },
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Cookie': `${d7.session_name}=${d7.sessid}`
+              },
               signal: AbortSignal.timeout(5000)
             });
           } catch(e) {}

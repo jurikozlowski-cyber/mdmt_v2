@@ -146,10 +146,13 @@ async function publishDrupal7({ baseUrl, login, pass, title, content, status, me
   });
   const csrfToken = tokenRes.ok ? (await tokenRes.text()).trim() : '';
 
-  // Krok 2: Logowanie – sesja Services
-  const loginRes  = await fetch(`${baseUrl}/api/user/login`, {
+  // Krok 2: Logowanie – sesja Services (.json wymusza odpowiedź JSON)
+  const loginRes  = await fetch(`${baseUrl}/api/user/login.json`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
     body: JSON.stringify({ username: login, password: pass })
   });
   const loginText = await loginRes.text();
@@ -162,6 +165,7 @@ async function publishDrupal7({ baseUrl, login, pass, title, content, status, me
 
   const authHeaders = {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     'Cookie': sessionCookie,
     'X-CSRF-Token': sessionToken
   };
@@ -180,7 +184,7 @@ async function publishDrupal7({ baseUrl, login, pass, title, content, status, me
     nodePayload.publish_on = Math.floor(new Date(scheduled_at).getTime() / 1000);
   }
 
-  const nodeRes  = await fetch(`${baseUrl}/api/node`, {
+  const nodeRes  = await fetch(`${baseUrl}/api/node.json`, {
     method: 'POST',
     headers: authHeaders,
     body: JSON.stringify(nodePayload)
@@ -194,7 +198,7 @@ async function publishDrupal7({ baseUrl, login, pass, title, content, status, me
 
   // Krok 4: Wyloguj (zwolnij sesję)
   try {
-    await fetch(`${baseUrl}/api/user/logout`, {
+    await fetch(`${baseUrl}/api/user/logout.json`, {
       method: 'POST',
       headers: authHeaders
     });

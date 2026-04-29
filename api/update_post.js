@@ -100,11 +100,12 @@ export default async function handler(req, res) {
 
       const d7Headers = {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'Cookie': `${loginData.session_name}=${loginData.sessid}`,
         'X-CSRF-Token': loginData.token || ''
       };
 
-      const r7 = await fetch(`${baseUrl}/api/node/${post_id}`, {
+      const r7 = await fetch(`${baseUrl}/api/node/${post_id}.json`, {
         method: 'PUT',
         headers: d7Headers,
         body: JSON.stringify({
@@ -116,7 +117,7 @@ export default async function handler(req, res) {
       const text7 = await r7.text();
 
       // Wyloguj
-      try { await fetch(`${baseUrl}/api/user/logout`, { method: 'POST', headers: d7Headers }); } catch(e) {}
+      try { await fetch(`${baseUrl}/api/user/logout.json`, { method: 'POST', headers: d7Headers }); } catch(e) {}
 
       let data7;
       try { data7 = JSON.parse(text7); } catch { throw new Error(`Drupal 7 update błąd: ${text7.substring(0,200)}`); }
