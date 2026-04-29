@@ -252,8 +252,8 @@ input[type="datetime-local"] { color-scheme: dark; }
     </div>
     <div style="margin-top:14px" class="field">
       <label>Data i godzina publikacji (opcjonalnie – puste = natychmiast)</label>
-      <input type="datetime-local" id="scheduled_at" style="max-width:280px">
-      <div class="hint-text">Zostaw puste aby opublikować od razu po zakończeniu pipeline'u</div>
+      <input type="datetime-local" id="scheduled_at" style="max-width:280px" onchange="updateScheduleHint()">
+      <div id="schedule-hint" class="hint-text">⚡ Brak daty → wpis zostanie zapisany wg ustawień witryny (szkic lub od razu na żywo)</div>
     </div>
   </div>
 
@@ -303,8 +303,8 @@ input[type="datetime-local"] { color-scheme: dark; }
       </div>
       <div class="field col2">
         <label>Linkowanie – anchor | URL (każda para w osobnej linii)</label>
-        <textarea id="link_pairs" style="min-height:100px;font-family:monospace;font-size:13px" placeholder="anchor tekstu | https://adres.pl&#10;drugi anchor | https://adres2.pl | nofollow&#10;(pary rozdzielone nową linią; w CSV/Sheets użyj ;; zamiast nowej linii)"></textarea>
-        <div class="hint-text">Format: <strong>anchor | URL</strong> lub <strong>anchor | URL | nofollow</strong></div>
+        <textarea id="link_pairs" style="min-height:100px;font-family:monospace;font-size:13px" placeholder="anchor tekstu | https://adres.pl&#10;drugi anchor | https://adres2.pl | nofollow"></textarea>
+
       </div>
     </div>
   </div>
@@ -365,6 +365,10 @@ input[type="datetime-local"] { color-scheme: dark; }
       <div class="field">
         <label>Alt text zdjęcia 2</label>
         <input id="img2_alt" type="text" placeholder="Zostaw puste = fraza drugorzędna – temat (auto)">
+      </div>
+      <div class="field">
+        <label>Tytuł zdjęcia śródtekstowego (SEO)</label>
+        <input id="img2_title" type="text" placeholder="tytul-zdjecia-2-seo (puste = auto)">
       </div>
     </div>
   </div>
@@ -529,10 +533,7 @@ input[type="datetime-local"] { color-scheme: dark; }
         </div>
       </div>
       <div class="field col2" id="ns-cms-hint"></div>
-      <div class="field">
-        <label>Tagi domyślne (przecinkami)</label>
-        <input id="ns-tags" type="text" placeholder="tag1, tag2">
-      </div>
+
       <div class="field">
         <label>Kategorie domyślne (ID lub nazwy)</label>
         <input id="ns-categories" type="text" placeholder="ID lub nazwa kategorii">
@@ -974,6 +975,7 @@ function renderSiteSelector() {
 function onSiteSelect() {
   const id = document.getElementById('site-select').value;
   selectedSite = allSites.find(s => s.id === id) || null;
+  updateScheduleHint();
   const info = document.getElementById('selected-site-info');
   if (selectedSite) {
     info.style.display = 'flex';
@@ -1050,7 +1052,7 @@ function toggleAddPanel() {
 }
 
 function clearAddForm() {
-  ['ns-name','ns-url','ns-login','ns-pass','ns-tags','ns-categories','ns-notes'].forEach(id => {
+  ['ns-name','ns-url','ns-login','ns-pass','ns-categories','ns-notes'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1090,7 +1092,7 @@ async function saveSite() {
   const cms  = document.getElementById('ns-cms').value;
   const login = document.getElementById('ns-login').value.trim();
   const pass = document.getElementById('ns-pass').value.trim();
-  const tags = document.getElementById('ns-tags').value.trim();
+  const tags = '';
   const categories = document.getElementById('ns-categories').value.trim();
   const default_status = document.getElementById('ns-status').value;
   const notes = document.getElementById('ns-notes').value.trim();
@@ -1130,7 +1132,6 @@ function editSite(id) {
   document.getElementById('ns-status').value = s.default_status || 'draft';
   document.getElementById('ns-login').value = s.login;
   document.getElementById('ns-pass').value  = s.password_enc;
-  document.getElementById('ns-tags').value  = s.tags || '';
   document.getElementById('ns-categories').value = s.categories || '';
   document.getElementById('ns-notes').value = s.notes || '';
   onNsCmsChange();
@@ -1496,6 +1497,7 @@ async function runPipeline() {
   const img1_alt     = document.getElementById('img1_alt').value.trim()     || autoAlt1;
   const img2_alt     = document.getElementById('img2_alt').value.trim()     || img1_alt;
   const img_title    = document.getElementById('img_title').value.trim()    || mainKw.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  const img2_title   = document.getElementById('img2_title').value.trim()   || (img_title + '-2');
   const status_val   = scheduled_at ? 'future' : (site.default_status || 'draft');
 
   const apiBase = {
@@ -1740,7 +1742,7 @@ async function runPipeline() {
           post_id: postId, image_num: 2,
           prompt1: img1_prompt, prompt2: img2_prompt,
           alt1: img1_alt, alt2: img2_alt,
-          img_title: img_title + '-srodtekstowe'
+          img_title: img2_title || (img_title + '-srodtekstowe')
         });
         if (!r.image_url) throw new Error('Brak URL');
         document.getElementById('img2-preview').innerHTML = `<img src="${r.image_url}" alt="srodtekstowe">`;
@@ -1878,6 +1880,21 @@ async function endPipeline(success, errMsg, ctx) {
 
 function esc(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function updateScheduleHint() {
+  const val  = document.getElementById('scheduled_at').value;
+  const hint = document.getElementById('schedule-hint');
+  const site = selectedSite;
+  if (!hint) return;
+  if (val) {
+    const dt = new Date(val).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' });
+    hint.innerHTML = `📅 Data ustawiona → wpis zostanie <strong>zaplanowany</strong> i opublikuje się automatycznie <strong>${dt}</strong>`;
+  } else {
+    const defStatus = site?.default_status || 'draft';
+    const label = defStatus === 'publish' ? '<strong style="color:var(--success)">od razu na żywo</strong>' : '<strong>jako szkic</strong>';
+    hint.innerHTML = `⚡ Brak daty → wpis zostanie zapisany ${label} (wg ustawień witryny)`;
+  }
 }
 
 
@@ -2706,6 +2723,21 @@ function resetQueueReport() {
   queueReport = [];
   document.getElementById('q-report').style.display = 'none';
   renderQueue();
+}
+
+function clearBrief() {
+  if (!confirm('Wyczyścić wszystkie pola briefu?')) return;
+  ['topic','keywords','audience','link_pairs','extra_info',
+   'meta_title_input','meta_desc_input','post_slug',
+   'img1_prompt','img2_prompt','img1_alt','img2_alt',
+   'img_title','img2_title','scheduled_at'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('length').value = '4000';
+  document.getElementById('tone').value   = 'przyjazny i naturalny';
+  document.getElementById('topic-count').textContent = '0 znaków';
+  updateScheduleHint();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
