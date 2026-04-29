@@ -1077,7 +1077,19 @@ function onNsCmsChange() {
   } else if (cms === 'drupal') {
     loginLabel.textContent = 'Login Drupal *';
     passLabel.textContent  = 'Hasło Drupal *';
-    hint.innerHTML = '<div class="cms-hint"><strong>Drupal 8/9/10:</strong> włącz moduł <strong>HTTP Basic Authentication</strong> i <strong>JSON:API</strong> w Rozszerzenia.<br><strong>Drupal 7:</strong> zainstaluj moduł <strong>Services</strong> + <strong>REST Server</strong>, utwórz endpoint o ścieżce <code>api</code> z zasobami <code>node (create)</code> i <code>user (login/logout)</code>.<br>Wersja jest wykrywana automatycznie.</div>';
+    hint.innerHTML = '<div class="cms-hint">' +
+      '<strong>Drupal 8 / 9 / 10:</strong><br>' +
+      '1. Włącz moduły: <em>Rozszerzenia → HTTP Basic Authentication</em> + <em>JSON:API</em><br>' +
+      '2. Uprawnienia: <em>Ludzie → Uprawnienia</em> → rola użytkownika → zaznacz <strong>Article: Tworzenie nowych wpisów</strong><br>' +
+      '3. Login i hasło: dane konta z uprawnieniami edytora lub admina<br><br>' +
+      '<strong>Drupal 7:</strong><br>' +
+      '1. Zainstaluj moduły: <strong>Services</strong> + <strong>REST Server</strong><br>' +
+      '2. Utwórz endpoint: <em>Struktura → Services → Dodaj</em> → ścieżka: <code>api</code>, serwer: REST, zaznacz <em>Session authentication</em><br>' +
+      '3. W zakładce <em>Resources</em> włącz: <code>node → create</code> oraz <code>user → login, logout</code><br>' +
+      '4. Uprawnienia: <em>Ludzie → Uprawnienia</em> → Użytkownik uwierzytelniony → zaznacz <strong>Article: Tworzenie nowych wpisów</strong><br>' +
+      '5. Login i hasło: dane konta admina lub edytora<br><br>' +
+      '<em>Wersja Drupala wykrywana jest automatycznie – kliknij 🔌 Testuj połączenie aby sprawdzić.</em>' +
+      '</div>';
   } else {
     loginLabel.textContent = 'Login WordPress *';
     passLabel.textContent  = 'App Password * (WP → Użytkownicy → Profil → Hasła aplikacji)';
