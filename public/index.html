@@ -842,7 +842,7 @@ input[type="datetime-local"] { color-scheme: dark; }
       Pierwszy wiersz to nagłówki – używaj polskich nazw kolumn:<br><br>
       <code>blog</code> &nbsp;·&nbsp; <code>temat</code> &nbsp;·&nbsp; <code>frazy</code> &nbsp;·&nbsp; <code>długość</code> &nbsp;·&nbsp; <code>linki</code><br>
       <code>zdjecia</code> (liczba: 0/1/2) &nbsp;·&nbsp; <code>zdjecie</code> &nbsp;·&nbsp; <code>zdjecie2</code><br>
-      <code>meta_title</code> &nbsp;·&nbsp; <code>meta_desc</code> &nbsp;·&nbsp; <code>slug</code> &nbsp;·&nbsp; <code>data</code><br>
+      <code>meta_title</code> &nbsp;·&nbsp; <code>meta_desc</code> &nbsp;·&nbsp; <code>slug</code> &nbsp;·&nbsp; <code>data</code> (format: <code>2026-12-31 08:00</code> lub puste)<br>
       <code>wytyczne</code> &nbsp;·&nbsp; <code>styl</code> &nbsp;·&nbsp; <code>odbiorcy</code><br><br>
       <strong>Linkowanie</strong> – wiele linków w jednej komórce, oddzielone <code>;;</code>:<br>
       <code>anchor | https://adres.pl ;; drugi anchor | https://adres2.pl | nofollow</code>
@@ -2314,7 +2314,8 @@ async function handleQueueCSV(input) {
 
 function downloadQueueTemplate() {
   const header = 'blog,temat,frazy,długość,linki,zdjecia,zdjecie,zdjecie2,meta_title,meta_desc,slug,data,wytyczne,styl,odbiorcy';
-  const example = '"https://twojadomena.pl","Tytuł artykułu","fraza główna, fraza pomocnicza, fraza długiego ogona","4000","anchor tekst | https://link.pl ;; drugi anchor | https://link2.pl | nofollow","1","opis sceny do zdjęcia wyróżnionego","","","","","","","przyjazny i naturalny",""';
+  const example = '"https://twojadomena.pl","Tytuł artykułu","fraza główna, fraza pomocnicza, fraza długiego ogona","4000","anchor tekst | https://link.pl ;; drugi anchor | https://link2.pl | nofollow","1","opis sceny do zdjęcia wyróżnionego","","","","","2026-12-31 08:00","","przyjazny i naturalny",""';
+  // Format daty: YYYY-MM-DD HH:MM (np. 2026-12-31 08:00) lub puste = publikuj od razu
   const blob = new Blob(['\uFEFF' + header + '\n' + example], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2541,7 +2542,7 @@ async function startQueue() {
           content: article, status: 'draft',
           meta_title: metaTitle, meta_desc: metaDesc,
           post_slug: job.post_slug || '',
-          scheduled_at: job.scheduled_at || null
+          scheduled_at: safeScheduled
         })
       }).then(r => r.json());
       if (r4.error) throw new Error(r4.error);
@@ -2625,7 +2626,10 @@ async function startQueue() {
 
       // 7. FINALIZACJA – zmień status na docelowy
       qStep('finalize', 'running'); qMsg('Finalizuję...');
-      const finalStatus = job.scheduled_at ? 'future' : (site.default_status || 'draft');
+      // Waliduj datę – zły format traktujemy jak brak daty
+      const validDate   = job.scheduled_at && !isNaN(new Date(job.scheduled_at).getTime());
+      const finalStatus = validDate ? 'future' : (site.default_status || 'draft');
+      const safeScheduled = validDate ? job.scheduled_at : null;
       await fetch('/api/update_post', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cms: site.cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc, post_id: postId, content: article, title: job.topic, status: finalStatus })
