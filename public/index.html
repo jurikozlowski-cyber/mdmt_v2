@@ -1465,56 +1465,51 @@ async function runPipeline() {
   document.getElementById('retry-btn').style.display  = 'none';
   document.getElementById('status-bar').classList.add('on');
 
-  const settings  = getSettings();
-  const site      = selectedSite;
-  const cms       = site.cms;
+  const settings = getSettings();
+  const site     = selectedSite;
+  const cms      = site.cms;
 
-  // ── Zbierz dane z briefu ──────────────────────────────────────────────────
-  const length       = document.getElementById('length').value;
-  const tone         = document.getElementById('tone').value;
-  const audience     = document.getElementById('audience').value.trim();
-  const link_pairs   = document.getElementById('link_pairs').value.trim();
-  const extra_info   = document.getElementById('extra_info').value.trim();
-  const meta_title_in= document.getElementById('meta_title_input').value.trim();
-  const meta_desc_in = document.getElementById('meta_desc_input').value.trim();
-  const tags         = document.getElementById('tags').value.trim() || site.tags || '';
-  const categories   = document.getElementById('categories').value.trim() || site.categories || '';
-  const post_slug    = document.getElementById('post_slug').value.trim();
-  const scheduled_at = document.getElementById('scheduled_at').value || null;
-  const img1On       = document.getElementById('img1-toggle').checked;
-  const img2On       = document.getElementById('img2-toggle').checked;
-  // AUTO-PROMPT: jeśli puste – generuj z tematu i fraz
-  const mainKw       = keywords.split(',')[0].trim();
-  const kwContext    = keywords.split(',').slice(0,3).map(k => k.replace(/x\d+$/i,'').trim()).filter(Boolean).join(', ');
-  const autoPrompt1  = `Profesjonalne zdjęcie do artykułu: ${topic}. Kontekst: ${kwContext}.`;
-  const autoPrompt2  = `Zdjęcie śródtekstowe do artykułu: ${topic}. Kontekst: ${kwContext}.`;
-  const img1_prompt  = document.getElementById('img1_prompt').value.trim()  || autoPrompt1;
-  const img2_prompt  = document.getElementById('img2_prompt').value.trim()  || autoPrompt2;
-  const mainKwClean  = mainKw.replace(/x\d+$/i,'').trim();
-  const secondKw     = keywords.split(',').length > 1 ? keywords.split(',')[1].trim().replace(/x\d+$/i,'').trim() : mainKwClean;
-  const autoAlt1     = `${mainKwClean} – ${topic}`.substring(0, 100);
-  const autoAlt2     = `${secondKw} – ${topic}`.substring(0, 100);
-  const img1_alt     = document.getElementById('img1_alt').value.trim()     || autoAlt1;
-  const img2_alt     = document.getElementById('img2_alt').value.trim()     || img1_alt;
-  const img_title    = document.getElementById('img_title').value.trim()    || mainKw.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
-  const img2_title   = document.getElementById('img2_title').value.trim()   || (img_title + '-2');
-  const status_val   = scheduled_at ? 'future' : (site.default_status || 'draft');
-
-  const apiBase = {
-    api_provider: settings.api_provider || 'gemini',
-    api_model:    settings.api_model || ''
-  };
-
-  // Stan pipeline'u
-  let research = '', article = '', metaTitle = '', metaDesc = '', postId = null, postLink = '';
+  // ── Dane z briefu ─────────────────────────────────────────────────────────
+  const length        = document.getElementById('length').value;
+  const tone          = document.getElementById('tone').value;
+  const audience      = document.getElementById('audience').value.trim();
+  const link_pairs    = document.getElementById('link_pairs').value.trim();
+  const extra_info    = document.getElementById('extra_info').value.trim();
+  const meta_title_in = document.getElementById('meta_title_input').value.trim();
+  const meta_desc_in  = document.getElementById('meta_desc_input').value.trim();
+  const post_slug     = document.getElementById('post_slug').value.trim();
+  const scheduled_at  = document.getElementById('scheduled_at').value || null;
+  const img1On        = document.getElementById('img1-toggle').checked;
+  const img2On        = document.getElementById('img2-toggle').checked;
+  const mainKw        = keywords.split(',')[0].trim();
+  const mainKwClean   = mainKw.replace(/x\d+$/i,'').trim();
+  const secondKw      = keywords.split(',').length > 1 ? keywords.split(',')[1].trim().replace(/x\d+$/i,'').trim() : mainKwClean;
+  const kwContext     = keywords.split(',').slice(0,3).map(k => k.replace(/x\d+$/i,'').trim()).filter(Boolean).join(', ');
+  const autoPrompt1   = `Profesjonalne zdjęcie do artykułu: ${topic}. Kontekst: ${kwContext}.`;
+  const autoPrompt2   = `Zdjęcie śródtekstowe do artykułu: ${topic}. Kontekst: ${kwContext}.`;
+  const autoAlt1      = `${mainKwClean} – ${topic}`.substring(0, 100);
+  const autoAlt2      = `${secondKw} – ${topic}`.substring(0, 100);
+  const img1_prompt   = document.getElementById('img1_prompt').value.trim()  || autoPrompt1;
+  const img2_prompt   = document.getElementById('img2_prompt').value.trim()  || autoPrompt2;
+  const img1_alt      = document.getElementById('img1_alt').value.trim()     || autoAlt1;
+  const img2_alt      = document.getElementById('img2_alt').value.trim()     || autoAlt2;
+  const img_title     = document.getElementById('img_title').value.trim()    || mainKwClean.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  const img2_title    = document.getElementById('img2_title').value.trim()   || (img_title + '-2');
+  const status_val    = scheduled_at ? 'future' : (site.default_status || 'draft');
   const targetChars   = parseInt(length) || 3000;
   const minAcceptable = targetChars * 0.6;
 
-  document.getElementById('run-site-info').textContent = `${site.name} · ${cms.toUpperCase()} · ${site.url}`;
+  document.getElementById('run-site-info').textContent = `${site.url} · ${cms.toUpperCase()}`;
+
+  let research = '', article = '', metaTitle = '', metaDesc = '', postId = null, postLink = '';
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // FAZA 1 – generowanie treści + publikacja szkicu (~25-40s)
+  // ════════════════════════════════════════════════════════════════════════════
 
   // ── 1. RESEARCH ──────────────────────────────────────────────────────────
   setStep('research', 'running', 'Analizuję temat...');
-  setStatus('Krok 1/7 – Research');
+  setStatus('Faza 1/2 · Krok 1/4 – Research');
   try {
     const r = await callWithFallback('research', {
       topic, keywords, audience, extra_info,
@@ -1531,9 +1526,9 @@ async function runPipeline() {
 
   checkAbort();
 
-  // ── 2. WRITE (auto-retry do 3 razy jeśli za krótki) ─────────────────────
+  // ── 2. WRITE ─────────────────────────────────────────────────────────────
   setStep('write', 'running', 'Piszę artykuł...');
-  setStatus('Krok 2/7 – Pisanie tekstu');
+  setStatus('Faza 1/2 · Krok 2/4 – Pisanie');
   let writeOk = false;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
@@ -1557,21 +1552,17 @@ async function runPipeline() {
       if (chars > 1000) {
         setStep('write', 'done', `Artykuł napisany (${chars.toLocaleString()} zzs – krótszy niż cel)`);
         setOut('write', article.replace(/<[^>]+>/g,' ').substring(0,400) + '…');
+        _currentArticleHTML = article;
         writeOk = true;
       } else {
-        setStep('write', 'error', `Artykuł za krótki po 3 próbach. Zmień model lub spróbuj później.`);
+        setStep('write', 'error', 'Artykuł za krótki po 3 próbach.');
         return endPipeline(false, 'Artykuł za krótki', {topic, keywords, site, article, metaTitle});
       }
     } catch(e) {
       if (isAbort(e)) return endPipeline();
       if (attempt < 3) { await delay(2000); continue; }
-      if (article.length > 500) {
-        setStep('write', 'done', `Artykuł z poprzedniej próby (błąd: ${e.message})`);
-        writeOk = true;
-      } else {
-        setStep('write', 'error', 'Błąd pisania: ' + e.message);
-        return endPipeline(false, e.message, {topic, keywords, site, article, metaTitle});
-      }
+      setStep('write', 'error', 'Błąd pisania: ' + e.message);
+      return endPipeline(false, e.message, {topic, keywords, site, article, metaTitle});
     }
   }
 
@@ -1579,19 +1570,17 @@ async function runPipeline() {
 
   // ── 3. SEO ───────────────────────────────────────────────────────────────
   setStep('seo', 'running', 'Optymalizacja SEO...');
-  setStatus('Krok 3/7 – SEO');
+  setStatus('Faza 1/2 · Krok 3/4 – SEO');
   try {
     const r = await callWithFallback('seo', {
-      article, topic,
-      main_keyword: mainKw
+      article, topic, main_keyword: mainKw.replace(/x\d+$/i,'').trim()
     });
     const d = r.result || {};
-    article    = d.corrected_article || article;
-    metaTitle  = meta_title_in || d.meta_title || topic;
-    metaDesc   = meta_desc_in  || d.meta_description || '';
-    setStep('seo', 'done', `Meta title gotowy`);
+    article   = d.corrected_article || article;
+    metaTitle = meta_title_in || d.meta_title || topic;
+    metaDesc  = meta_desc_in  || d.meta_description || '';
+    setStep('seo', 'done', 'Meta dane gotowe');
     setOut('seo', `📌 ${metaTitle}\n📝 ${metaDesc}\n\n${d.seo_notes||''}`);
-    showSeoQuality(article, mainKw);
   } catch(e) {
     if (isAbort(e)) return endPipeline();
     setStep('seo', 'error', e.message);
@@ -1599,7 +1588,6 @@ async function runPipeline() {
     metaDesc  = meta_desc_in  || '';
   }
 
-  // Walidacja HTML przed publikacją
   const val = validateHtml(article);
   if (!val.ok) {
     setStep('publish', 'error', `Wstrzymano: ${val.reason}`);
@@ -1610,14 +1598,14 @@ async function runPipeline() {
 
   // ── 4. PUBLIKACJA SZKICU ─────────────────────────────────────────────────
   setStep('publish', 'running', `Publikuję szkic na ${cms.toUpperCase()}...`);
-  setStatus('Krok 4/7 – Publikacja szkicu');
+  setStatus('Faza 1/2 · Krok 4/4 – Publikacja szkicu');
   try {
     const r = await callApi('publish', {
       cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
       title: topic, brief_topic: topic, content: article,
       status: 'draft', excerpt: metaDesc,
       meta_title: metaTitle, meta_desc: metaDesc,
-      tags, categories, post_slug
+      post_slug, scheduled_at
     });
     postId   = r.id;
     postLink = r.link || '';
@@ -1630,10 +1618,18 @@ async function runPipeline() {
 
   checkAbort();
 
+  // ── Mikropauza między fazami ──────────────────────────────────────────────
+  setStatus('Faza 2/2 – Korekta i zdjęcia...');
+  await delay(500);
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // FAZA 2 – korekta + zdjęcia + finalizacja (~15-30s)
+  // ════════════════════════════════════════════════════════════════════════════
+
   // ── 5. KOREKTA JĘZYKOWA ──────────────────────────────────────────────────
   setStep('proofread', 'running', 'Korekta językowa...');
-  setStatus('Krok 5/7 – Korekta językowa');
-  await delay(500);
+  setStatus('Faza 2/2 · Krok 1/3 – Korekta');
+  await delay(300);
 
   const origPCount  = (article.match(/<p[^>]*>/gi) || []).length;
   const origH2Count = (article.match(/<h2[^>]*>/gi) || []).length;
@@ -1645,16 +1641,14 @@ async function runPipeline() {
   try {
     const rp = await callWithFallback('proofread', { article, keywords });
     let proof = cleanHtml(rp.result || '');
+    const lenOk = proof.length >= article.length * 0.8;
+    const pOk   = Math.abs((proof.match(/<p[^>]*>/gi)||[]).length - origPCount) <= 2;
+    const h2Ok  = (proof.match(/<h2[^>]*>/gi)||[]).length >= origH2Count - 1;
 
-    const lenOk  = proof.length >= article.length * 0.8;
-    const pOk    = Math.abs((proof.match(/<p[^>]*>/gi)||[]).length - origPCount) <= 2;
-    const h2Ok   = (proof.match(/<h2[^>]*>/gi)||[]).length >= origH2Count - 1;
-
-    // Przywróć brakujące linki
     let linksFixed = 0;
     for (const lnk of origLinks) {
       if (!proof.includes(lnk.href)) {
-        const re = new RegExp(lnk.anchor.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i');
+        const re  = new RegExp(lnk.anchor.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i');
         const rel = lnk.nofollow ? ' rel="nofollow"' : '';
         proof = proof.replace(re, `<a href="${lnk.href}"${rel}>${lnk.anchor}</a>`);
         linksFixed++;
@@ -1665,25 +1659,27 @@ async function runPipeline() {
       article = proof;
       const warns = linksFixed > 0 ? ` – przywrócono ${linksFixed} link(i)` : '';
       setStep('proofread', 'done', `Korekta zakończona${warns}`);
-      // Zaktualizuj szkic po korekcie
-      try { await callApi('update_post', { cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc, post_id: postId, content: article, title: topic, status: 'draft' }); }
-      catch(eu) { console.warn('update_post po korekcie:', eu.message); }
+      try {
+        await callApi('update_post', {
+          cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
+          post_id: postId, content: article, title: topic, status: 'draft'
+        });
+      } catch(eu) { console.warn('update po korekcie:', eu.message); }
     } else {
       const why = [!lenOk && 'za krótki', !pOk && 'zmiana akapitów', !h2Ok && 'brak nagłówków'].filter(Boolean).join(', ');
       setStep('proofread', 'done', `Użyto oryginału (${why})`);
     }
   } catch(e) {
     if (isAbort(e)) return endPipeline();
-    setStep('proofread', 'error', `Błąd korekty: ${e.message} (kontynuuję)`);
+    setStep('proofread', 'error', `Błąd korekty (kontynuuję): ${e.message}`);
   }
 
   checkAbort();
 
   // ── 6. ZDJĘCIE WYRÓŻNIONE ────────────────────────────────────────────────
-  setStatus('Krok 6/7 – Zdjęcia');
+  setStatus('Faza 2/2 · Krok 2/3 – Zdjęcia');
   if (img1On) {
     setStep('img1', 'running', 'Generuję zdjęcie wyróżnione...');
-    let img1ok = false;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         if (attempt > 1) { setStep('img1','running',`Zdjęcie wyróżnione – próba ${attempt}/3...`); await delay(3000); }
@@ -1693,45 +1689,40 @@ async function runPipeline() {
           prompt1: img1_prompt, alt1: img1_alt,
           img_title: img_title + '-featured'
         });
-        if (!r.image_url) throw new Error('Brak URL');
+        if (!r.image_url) throw new Error('Brak URL obrazu');
         document.getElementById('img1-preview').innerHTML = `<img src="${r.image_url}" alt="featured">`;
         _imgData[1] = r.image_url;
         document.getElementById('img1-actions').style.display = 'flex';
         setStep('img1', 'done', `Zdjęcie dodane${r.compressed?' (skompresowane)':''}`);
-        img1ok = true; break;
+        break;
       } catch(e) {
         if (attempt === 3) setStep('img1', 'error', 'Błąd: ' + e.message);
       }
     }
-    if (!img1ok) setStep('img1', 'error', 'Nie udało się wygenerować zdjęcia po 3 próbach');
   } else {
     setStep('img1', 'skip', 'Pominięto');
   }
 
   checkAbort();
 
-  // ── 7. FINALIZACJA – zmień status na docelowy ────────────────────────────
-  setStatus('Krok 7/7 – Finalizacja');
+  // ── 7. FINALIZACJA ────────────────────────────────────────────────────────
+  setStatus('Faza 2/2 · Krok 3/3 – Finalizacja');
   setStep('img2', 'running', 'Finalizuję wpis...');
-  await delay(300);
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       await callApi('update_post', {
         cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
-        post_id: postId, content: article, title: topic,
-        status: status_val,
-        ...(scheduled_at ? {} : {})
+        post_id: postId, content: article, title: topic, status: status_val
       });
       break;
     } catch(e) {
       if (isAbort(e)) return endPipeline();
       if (attempt < 3) await delay(2000);
-      else console.warn('Finalizacja status:', e.message);
     }
   }
 
-  // ── 8. ZDJĘCIE ŚRÓDTEKSTOWE (po finalizacji) ─────────────────────────────
+  // ── 8. ZDJĘCIE ŚRÓDTEKSTOWE ──────────────────────────────────────────────
   if (img2On) {
     setStep('img2', 'running', 'Generuję zdjęcie śródtekstowe...');
     for (let attempt = 1; attempt <= 3; attempt++) {
@@ -1742,9 +1733,9 @@ async function runPipeline() {
           post_id: postId, image_num: 2,
           prompt1: img1_prompt, prompt2: img2_prompt,
           alt1: img1_alt, alt2: img2_alt,
-          img_title: img2_title || (img_title + '-srodtekstowe')
+          img_title: img2_title
         });
-        if (!r.image_url) throw new Error('Brak URL');
+        if (!r.image_url) throw new Error('Brak URL obrazu');
         document.getElementById('img2-preview').innerHTML = `<img src="${r.image_url}" alt="srodtekstowe">`;
         _imgData[2] = r.image_url;
         document.getElementById('img2-actions').style.display = 'flex';
@@ -2547,6 +2538,10 @@ async function startQueue() {
       qStep('publish', 'done');
 
       if (queueStop) throw new Error('__QUEUE_STOPPED__');
+
+      // ── Mikropauza między fazami (daje Vercelowi czas na reset) ──────────
+      qMsg('Faza 1 zakończona – startuję fazę 2...');
+      await delay(600);
 
       // 5. KOREKTA
       qStep('proofread', 'running'); qMsg('Korekta językowa...');
