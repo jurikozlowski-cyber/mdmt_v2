@@ -214,7 +214,7 @@ input[type="datetime-local"] { color-scheme: dark; }
 <div id="app" style="display:none">
 
 <header class="header">
-  <div class="logo"><div class="logo-dot"></div><span>MDMT v2</span></div>
+  <div class="logo"><div class="logo-dot"></div><span>MDMT v2</span><span id="supabase-status" title="Status Supabase" style="width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;margin-left:8px"></span></div>
   <nav class="nav">
     <button class="nav-btn active" onclick="nav('brief')">📝 Brief</button>
     <button class="nav-btn" onclick="nav('run')">▶ Uruchom</button>
@@ -370,14 +370,6 @@ input[type="datetime-local"] { color-scheme: dark; }
     <div class="card-title">Dodatkowe wytyczne</div>
     <div class="grid full">
       <div class="field">
-        <label>Tagi (oddziel przecinkami)</label>
-        <input id="tags" type="text" placeholder="np. buty, bieganie, góry, trail">
-      </div>
-      <div class="field">
-        <label>Kategorie (ID lub nazwy, oddziel przecinkami)</label>
-        <input id="categories" type="text" placeholder="np. Sport, Bieganie">
-      </div>
-      <div class="field">
         <label>Slug URL (opcjonalnie)</label>
         <input id="post_slug" type="text" placeholder="np. buty-do-biegania-w-gorach – zostaw puste = auto">
       </div>
@@ -421,6 +413,7 @@ input[type="datetime-local"] { color-scheme: dark; }
         <div class="step-label">Pisanie artykułu</div>
         <div class="step-msg" id="msg-write">Oczekiwanie...</div>
         <div class="out-box" id="out-write"></div>
+        <button class="btn btn-ghost btn-sm" id="copy-html-btn" style="display:none;margin-top:8px" onclick="copyArticleHTML()">📋 Kopiuj HTML</button>
       </div>
     </div>
     <div class="step" id="step-proofread">
@@ -444,6 +437,10 @@ input[type="datetime-local"] { color-scheme: dark; }
         <div class="step-label">Zdjęcie wyróżnione</div>
         <div class="step-msg" id="msg-img1">Oczekiwanie...</div>
         <div class="imgs-row"><div class="img-box" id="img1-preview">Brak zdjęcia</div></div>
+        <div id="img1-actions" style="display:none;margin-top:8px;display:none;gap:8px" class="btn-row">
+          <button class="btn btn-ghost btn-sm" onclick="regenerateImage(1)">🔄 Regeneruj</button>
+          <button class="btn btn-ghost btn-sm" onclick="downloadImage(1)">⬇️ Pobierz</button>
+        </div>
       </div>
     </div>
     <div class="step" id="step-publish">
@@ -459,6 +456,10 @@ input[type="datetime-local"] { color-scheme: dark; }
         <div class="step-label">Zdjęcie śródtekstowe</div>
         <div class="step-msg" id="msg-img2">Oczekiwanie...</div>
         <div class="imgs-row"><div class="img-box" id="img2-preview">Brak zdjęcia</div></div>
+        <div id="img2-actions" style="display:none;margin-top:8px;gap:8px" class="btn-row">
+          <button class="btn btn-ghost btn-sm" onclick="regenerateImage(2)">🔄 Regeneruj</button>
+          <button class="btn btn-ghost btn-sm" onclick="downloadImage(2)">⬇️ Pobierz</button>
+        </div>
       </div>
     </div>
   </div>
@@ -561,13 +562,13 @@ input[type="datetime-local"] { color-scheme: dark; }
   </div>
 
   <div class="hist-filters">
-    <select id="hist-filter" onchange="filterHistory()" style="width:auto;padding:8px 12px">
+    <select id="hist-filter" onchange="histPage=1;loadHistory()" style="width:auto;padding:8px 12px">
       <option value="">Wszystkie statusy</option>
       <option value="published">Opublikowane</option>
       <option value="draft">Szkice</option>
       <option value="error">Błędy</option>
     </select>
-    <select id="hist-cms-filter" onchange="filterHistory()" style="width:auto;padding:8px 12px">
+    <select id="hist-cms-filter" onchange="histPage=1;loadHistory()" style="width:auto;padding:8px 12px">
       <option value="">Wszystkie CMS</option>
       <option value="wordpress">WordPress</option>
       <option value="joomla">Joomla</option>
@@ -575,6 +576,11 @@ input[type="datetime-local"] { color-scheme: dark; }
     </select>
     <button class="btn btn-ghost btn-sm" onclick="loadHistory()">🔄 Odśwież</button>
     <button class="btn btn-ghost btn-sm" onclick="exportHistoryCSV()">📥 Eksportuj CSV</button>
+  </div>
+  <div id="hist-pagination" style="display:none;display:flex;gap:8px;align-items:center;margin-bottom:12px;font-size:13px">
+    <button class="btn btn-ghost btn-sm" id="hist-prev" onclick="histPage--;loadHistory()">← Poprzednia</button>
+    <span id="hist-page-info" style="color:var(--muted)">Strona 1</span>
+    <button class="btn btn-ghost btn-sm" id="hist-next" onclick="histPage++;loadHistory()">Następna →</button>
   </div>
 
   <div class="hist-table-wrap">
@@ -629,6 +635,7 @@ input[type="datetime-local"] { color-scheme: dark; }
     <div class="field">
       <label>Master prompt (zostaw puste = domyślny wbudowany)</label>
       <textarea id="masterprompt" style="min-height:180px;font-family:monospace;font-size:12px" placeholder="Jesteś copywriterem SEO..."></textarea>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="resetMasterprompt()">↩ Przywróć domyślny</button>
     </div>
   </div>
 
@@ -637,6 +644,7 @@ input[type="datetime-local"] { color-scheme: dark; }
     <div class="field">
       <label>Research prompt (zostaw puste = domyślny wbudowany)</label>
       <textarea id="researchprompt" style="min-height:120px;font-family:monospace;font-size:12px" placeholder="Jesteś asystentem do researchu SEO..."></textarea>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="resetResearchprompt()">↩ Przywróć domyślny</button>
     </div>
   </div>
 
@@ -750,6 +758,34 @@ input[type="datetime-local"] { color-scheme: dark; }
         <input id="qm-img" type="text" placeholder="auto z tematu">
       </div>
       <div class="field col2">
+        <label>Linkowanie – anchor | URL (każda para w osobnej linii)</label>
+        <textarea id="qm-links" style="min-height:70px;font-family:monospace;font-size:12px" placeholder="tekst anchora | https://twoja-strona.pl&#10;fraza | https://link.pl | nofollow"></textarea>
+      </div>
+      <div class="field col2">
+        <label>Prompt zdjęcia śródtekstowego (opcjonalnie)</label>
+        <input id="qm-img2" type="text" placeholder="auto z tematu">
+      </div>
+      <div class="field">
+        <label>Meta title (opcjonalnie)</label>
+        <input id="qm-meta-title" type="text" placeholder="max 60 znaków">
+      </div>
+      <div class="field">
+        <label>Meta description (opcjonalnie)</label>
+        <input id="qm-meta-desc" type="text" placeholder="max 155 znaków">
+      </div>
+      <div class="field">
+        <label>Slug URL (opcjonalnie)</label>
+        <input id="qm-slug" type="text" placeholder="np. moj-artykul-seo">
+      </div>
+      <div class="field">
+        <label>Zdjęcia</label>
+        <select id="qm-photos">
+          <option value="1">1 zdjęcie (wyróżnione)</option>
+          <option value="2">2 zdjęcia (wyróżnione + śródtekstowe)</option>
+          <option value="0">Bez zdjęć</option>
+        </select>
+      </div>
+      <div class="field col2">
         <label>Dodatkowe wytyczne</label>
         <input id="qm-extra" type="text" placeholder="opcjonalnie">
       </div>
@@ -801,7 +837,20 @@ input[type="datetime-local"] { color-scheme: dark; }
 
     <div class="notice notice-info" style="margin-bottom:16px">
       Arkusz musi być udostępniony jako <strong>„Każdy z linkiem może wyświetlać"</strong>.<br>
-      Pierwszy wiersz = nagłówki: <code>topic, keywords, site_name, length, tone, scheduled_at, img1_prompt, audience, extra_info</code>
+      Pierwszy wiersz = nagłówki (angielskie lub polskie):<br>
+      <code>topic</code> / <code>temat</code> &nbsp;·&nbsp;
+      <code>keywords</code> / <code>frazy</code> &nbsp;·&nbsp;
+      <code>site_name</code> / <code>blog</code> (URL witryny)<br>
+      <code>length</code> / <code>długość</code> &nbsp;·&nbsp;
+      <code>tone</code> / <code>styl</code> &nbsp;·&nbsp;
+      <code>scheduled_at</code> / <code>data</code><br>
+      <code>img1_prompt</code> / <code>zdjecie</code> &nbsp;·&nbsp;
+      <code>img2_prompt</code> &nbsp;·&nbsp;
+      <code>link_pairs</code> / <code>linki</code><br>
+      <code>meta_title</code> &nbsp;·&nbsp; <code>meta_desc</code> &nbsp;·&nbsp;
+      <code>slug</code> &nbsp;·&nbsp;
+      <code>audience</code> / <code>odbiorcy</code> &nbsp;·&nbsp;
+      <code>extra_info</code> / <code>wytyczne</code>
     </div>
 
     <div class="field" style="margin-bottom:14px">
@@ -883,6 +932,8 @@ function showApp() {
   loadSites();
   loadHistory();
   loadSettings();
+  loadQueueFromStorage();
+  checkSupabaseStatus();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -919,7 +970,7 @@ function renderSiteSelector() {
   allSites.forEach(s => {
     const opt = document.createElement('option');
     opt.value = s.id;
-    opt.textContent = `${s.name} (${s.cms.toUpperCase()})`;
+    opt.textContent = `${s.url} (${s.cms.toUpperCase()})`;
     sel.appendChild(opt);
   });
   if (prev && allSites.find(s => s.id === prev)) sel.value = prev;
@@ -963,6 +1014,7 @@ function renderSitesList() {
         </div>
         <div class="site-right">
           <span class="badge ${s.default_status === 'publish' ? 'badge-ok' : 'badge-draft'}">${s.default_status === 'publish' ? 'Publiczny' : 'Szkic'}</span>
+          <button class="icon-btn" onclick="event.stopPropagation();testConnection('${s.id}')" title="Testuj połączenie" id="test-btn-${s.id}">🔌</button>
           <button class="icon-btn" onclick="event.stopPropagation();editSite('${s.id}')" title="Edytuj">✏️</button>
           <button class="icon-btn del" onclick="event.stopPropagation();deleteSite('${s.id}')" title="Usuń">🗑</button>
         </div>
@@ -1192,24 +1244,39 @@ function parseCSVLine(line) {
 // ═══════════════════════════════════════════════════════════════════════════
 // HISTORY
 // ═══════════════════════════════════════════════════════════════════════════
+let histPage = 1;
+
 async function loadHistory() {
+  const statusF = document.getElementById('hist-filter')?.value || '';
+  const cmsF    = document.getElementById('hist-cms-filter')?.value || '';
   try {
-    const r = await fetch('/api/history');
+    const params = new URLSearchParams({ page: histPage });
+    if (statusF) params.set('status', statusF);
+    if (cmsF)    params.set('cms', cmsF);
+    const r = await fetch('/api/history?' + params.toString());
     const d = await r.json();
     allHistory = d.publications || [];
-    filterHistory();
+    renderHistory(allHistory);
+    // Update pagination UI
+    const totalPages = d.pages || 1;
+    const pagEl  = document.getElementById('hist-pagination');
+    const pgInfo = document.getElementById('hist-page-info');
+    const prevBtn = document.getElementById('hist-prev');
+    const nextBtn = document.getElementById('hist-next');
+    if (pagEl) {
+      pagEl.style.display = totalPages > 1 ? 'flex' : 'none';
+      if (pgInfo) pgInfo.textContent = `Strona ${histPage} z ${totalPages} (${d.total} wpisów)`;
+      if (prevBtn) prevBtn.disabled = histPage <= 1;
+      if (nextBtn) nextBtn.disabled = histPage >= totalPages;
+    }
   } catch(e) {
     console.error('loadHistory:', e);
   }
 }
 
 function filterHistory() {
-  const statusF = document.getElementById('hist-filter')?.value || '';
-  const cmsF    = document.getElementById('hist-cms-filter')?.value || '';
-  let data = allHistory;
-  if (statusF) data = data.filter(p => p.status === statusF);
-  if (cmsF)    data = data.filter(p => p.cms === cmsF);
-  renderHistory(data);
+  histPage = 1;
+  loadHistory();
 }
 
 function renderHistory(data) {
@@ -1265,12 +1332,30 @@ async function saveToHistory(data) {
 // ═══════════════════════════════════════════════════════════════════════════
 // SETTINGS
 // ═══════════════════════════════════════════════════════════════════════════
+// ─── Domyślne prompty (identyczne z v1) ──────────────────────────────────────
+const DEFAULT_MASTERPROMPT = `Jesteś copywriterem SEO. Pisz naturalnie po polsku, bez manier typowych dla AI.
+Używaj aktywnej formy czasownika. Mieszaj zdania krótkie z długimi.
+NIE używaj H1. Zacznij od leadu (3-6 zdań bez nagłówka), potem H2.
+Nigdy nie stawiaj nagłówka bezpośrednio pod innym nagłówkiem – między nimi zawsze akapit.
+Przy długich sekcjach H2 (powyżej 3 akapitów) rozważ dodanie nagłówków H3 jako podsekcji – poprawiają czytelność i strukturę SEO.
+Akapity 5-10 zdań. Nagłówki: tylko pierwsza litera wielka.
+Nie bolduj fraz kluczowych. Bold tylko dla ważnych danych lub liczb.
+Zakaz słów: kluczowy, istotny, idealny, doskonały, rewolucyjny, przełomowy, warto zaznaczyć, warto podkreślić, w dzisiejszych czasach, w dobie, bez wątpienia, należy pamiętać, podsumowanie.
+PRIORYTET: Pierwsza fraza kluczowa z listy MUSI pojawić się w pierwszym lub drugim zdaniu artykułu.
+Frazy kluczowe MUSZĄ pojawić się w tekście i w nagłówkach H2/H3. Jeśli przy frazie jest liczba (np. x3), użyj jej minimum tyle razy. Odmieniaj przez przypadki tak żeby brzmiały naturalnie, ale nigdy nie pomijaj frazy całkowicie.`;
+
+const DEFAULT_RESEARCHPROMPT = `Jesteś asystentem do researchu SEO. Zbierasz wyłącznie sprawdzalne informacje – działasz jako filtr oddzielający fakty od spekulacji.
+
+Zasady:
+- Podajesz tylko to, co wiesz na pewno. Jeśli brak danych – napisz wprost "Brak danych". Nie szacuj, nie zmyślaj, nie uzupełniaj luk.
+- Liczby i statystyki tylko gdy masz co do nich pewność – w przeciwnym razie opisuj zjawisko słowami ("rynek rośnie") zamiast podawać konkretną cyfrę.`;
+
 function loadSettings() {
   const s = JSON.parse(localStorage.getItem('mdmt_settings') || '{}');
   if (s.api_provider) document.getElementById('api_provider').value = s.api_provider;
   if (s.api_model)    document.getElementById('api_model').value    = s.api_model;
-  if (s.masterprompt) document.getElementById('masterprompt').value = s.masterprompt;
-  if (s.researchprompt) document.getElementById('researchprompt').value = s.researchprompt;
+  document.getElementById('masterprompt').value   = s.masterprompt   || DEFAULT_MASTERPROMPT;
+  document.getElementById('researchprompt').value = s.researchprompt || DEFAULT_RESEARCHPROMPT;
 }
 
 function saveSettings() {
@@ -1289,14 +1374,32 @@ function saveSettings() {
 function resetSettings() {
   if (!confirm('Przywrócić domyślne ustawienia?')) return;
   localStorage.removeItem('mdmt_settings');
-  document.getElementById('api_provider').value = 'gemini';
-  document.getElementById('api_model').value    = '';
-  document.getElementById('masterprompt').value = '';
-  document.getElementById('researchprompt').value = '';
+  document.getElementById('api_provider').value   = 'gemini';
+  document.getElementById('api_model').value      = '';
+  document.getElementById('masterprompt').value   = DEFAULT_MASTERPROMPT;
+  document.getElementById('researchprompt').value = DEFAULT_RESEARCHPROMPT;
+}
+
+function resetMasterprompt() {
+  if (!confirm('Przywrócić domyślny masterprompt?')) return;
+  document.getElementById('masterprompt').value = DEFAULT_MASTERPROMPT;
+  saveSettings();
+}
+
+function resetResearchprompt() {
+  if (!confirm('Przywrócić domyślny prompt researchu?')) return;
+  document.getElementById('researchprompt').value = DEFAULT_RESEARCHPROMPT;
+  saveSettings();
 }
 
 function getSettings() {
-  return JSON.parse(localStorage.getItem('mdmt_settings') || '{}');
+  const s = JSON.parse(localStorage.getItem('mdmt_settings') || '{}');
+  return {
+    api_provider:   s.api_provider   || 'gemini',
+    api_model:      s.api_model      || '',
+    masterprompt:   s.masterprompt   || DEFAULT_MASTERPROMPT,
+    researchprompt: s.researchprompt || DEFAULT_RESEARCHPROMPT,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1425,6 +1528,9 @@ async function runPipeline() {
       if (chars >= minAcceptable) {
         setStep('write', 'done', `Artykuł napisany (${chars.toLocaleString()} zzs)`);
         setOut('write', article.replace(/<[^>]+>/g,' ').substring(0,400) + '…');
+        _currentArticleHTML = article;
+        const copyBtn = document.getElementById('copy-html-btn');
+        if (copyBtn) copyBtn.style.display = 'inline-flex';
         writeOk = true; break;
       }
       if (attempt < 3) { await delay(2000); continue; }
@@ -1569,6 +1675,8 @@ async function runPipeline() {
         });
         if (!r.image_url) throw new Error('Brak URL');
         document.getElementById('img1-preview').innerHTML = `<img src="${r.image_url}" alt="featured">`;
+        _imgData[1] = r.image_url;
+        document.getElementById('img1-actions').style.display = 'flex';
         setStep('img1', 'done', `Zdjęcie dodane${r.compressed?' (skompresowane)':''}`);
         img1ok = true; break;
       } catch(e) {
@@ -1618,6 +1726,8 @@ async function runPipeline() {
         });
         if (!r.image_url) throw new Error('Brak URL');
         document.getElementById('img2-preview').innerHTML = `<img src="${r.image_url}" alt="srodtekstowe">`;
+        _imgData[2] = r.image_url;
+        document.getElementById('img2-actions').style.display = 'flex';
         setStep('img2', 'done', `Zdjęcie dodane${r.compressed?' (skompresowane)':''}`);
         break;
       } catch(e) {
@@ -1699,10 +1809,9 @@ function showSeoQuality(html, mainKw) {
 }
 
 function getMasterprompt(type) {
-  const key = type === 'research' ? 'mdmt_researchprompt' : 'mdmt_masterprompt';
-  const stored = JSON.parse(localStorage.getItem('mdmt_settings') || '{}');
-  if (type === 'research') return stored.researchprompt || '';
-  return stored.masterprompt || '';
+  const s = getSettings();
+  if (type === 'research') return s.researchprompt || DEFAULT_RESEARCHPROMPT;
+  return s.masterprompt || DEFAULT_MASTERPROMPT;
 }
 
 function setStatus(msg) {
@@ -1829,7 +1938,10 @@ async function fetchSheets() {
 
     let added = 0, skipped = 0;
     for (const rec of d.records) {
-      const site = allSites.find(s => s.name.toLowerCase() === (rec.site_name||'').toLowerCase()) || allSites[0];
+      const sn = rec.site_name || '';
+      const site = allSites.find(s => s.url === sn || s.url.replace(/\/$/, '') === sn.replace(/\/$/, ''))
+                || allSites.find(s => s.name.toLowerCase() === sn.toLowerCase())
+                || allSites[0];
       if (!site) { skipped++; continue; }
       queueJobs.push({
         id:           'job_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
@@ -1841,12 +1953,19 @@ async function fetchSheets() {
         tone:         rec.tone         || 'przyjazny i naturalny',
         scheduled_at: rec.scheduled_at || '',
         img_prompt:   rec.img1_prompt  || '',
+        img2_prompt:  rec.img2_prompt  || '',
+        link_pairs:   rec.link_pairs   || '',
+        meta_title:   rec.meta_title   || '',
+        meta_desc:    rec.meta_desc    || '',
+        post_slug:    rec.slug         || '',
+        photos:       parseInt(rec.photos) || 1,
         audience:     rec.audience     || '',
         extra:        rec.extra_info   || '',
         status:       'pending',
         post_url:     '',
         error_msg:    ''
       });
+      saveQueueToStorage();
       added++;
     }
 
@@ -1869,6 +1988,133 @@ document.addEventListener('click', function(e) {
   const modal = document.getElementById('sheets-modal');
   if (modal && e.target === modal) closeSheetsModal();
 });
+
+
+// ─── Queue localStorage persistence ─────────────────────────────────────────
+function saveQueueToStorage() {
+  try { localStorage.setItem('mdmt_queue', JSON.stringify(queueJobs)); } catch(e) {}
+}
+
+function loadQueueFromStorage() {
+  try {
+    const saved = localStorage.getItem('mdmt_queue');
+    if (saved) {
+      const jobs = JSON.parse(saved);
+      // Reset running jobs back to pending (were interrupted by page close)
+      queueJobs = jobs.map(j => j.status === 'running' ? { ...j, status: 'pending' } : j);
+      renderQueue();
+    }
+  } catch(e) {}
+}
+
+// ─── Test connection ─────────────────────────────────────────────────────────
+async function testConnection(siteId) {
+  const site = allSites.find(s => s.id === siteId);
+  if (!site) return;
+  const btn = document.getElementById('test-btn-' + siteId);
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+  try {
+    const r = await fetch('/api/test_connection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cms: site.cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc })
+    });
+    const d = await r.json();
+    if (btn) { btn.textContent = d.ok ? '✅' : '❌'; btn.disabled = false; btn.title = d.ok ? `Połączono${d.user ? ': ' + d.user : ''}` : d.error; }
+    setTimeout(() => { if (btn) { btn.textContent = '🔌'; btn.title = 'Testuj połączenie'; } }, 5000);
+  } catch(e) {
+    if (btn) { btn.textContent = '❌'; btn.disabled = false; btn.title = e.message; }
+    setTimeout(() => { if (btn) { btn.textContent = '🔌'; } }, 5000);
+  }
+}
+
+// ─── Supabase status ─────────────────────────────────────────────────────────
+async function checkSupabaseStatus() {
+  const dot = document.getElementById('supabase-status');
+  if (!dot) return;
+  try {
+    const r = await fetch('/api/sites');
+    const d = await r.json();
+    if (d.sites !== undefined) {
+      dot.style.background = 'var(--success)';
+      dot.title = 'Supabase: połączono';
+    } else throw new Error();
+  } catch(e) {
+    dot.style.background = 'var(--danger)';
+    dot.title = 'Supabase: brak połączenia';
+  }
+}
+
+// ─── Copy HTML ───────────────────────────────────────────────────────────────
+let _currentArticleHTML = '';
+
+function copyArticleHTML() {
+  if (!_currentArticleHTML) return;
+  navigator.clipboard.writeText(_currentArticleHTML).then(() => {
+    const btn = document.getElementById('copy-html-btn');
+    if (btn) { btn.textContent = '✅ Skopiowano!'; setTimeout(() => { btn.textContent = '📋 Kopiuj HTML'; }, 2000); }
+  }).catch(() => alert('Nie udało się skopiować. Twoja przeglądarka może nie obsługiwać clipboard API.'));
+}
+
+// ─── Image regenerate + download ─────────────────────────────────────────────
+let _imgData = { 1: null, 2: null }; // store image URLs for download
+
+function downloadImage(num) {
+  const url = _imgData[num];
+  if (!url) return;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mdmt-zdjecie-${num}-${Date.now()}.jpg`;
+  a.target = '_blank';
+  a.click();
+}
+
+async function regenerateImage(num) {
+  if (!selectedSite) return alert('Brak witryny docelowej.');
+  const site = selectedSite;
+  const topic    = document.getElementById('topic').value.trim();
+  const keywords = document.getElementById('keywords').value.trim();
+  const settings = getSettings();
+
+  const prompt = num === 1
+    ? (document.getElementById('img1_prompt').value.trim() || `Profesjonalne zdjęcie do artykułu: ${topic}`)
+    : (document.getElementById('img2_prompt').value.trim() || `Zdjęcie śródtekstowe do artykułu: ${topic}`);
+  const alt      = num === 1
+    ? (document.getElementById('img1_alt').value.trim() || topic)
+    : (document.getElementById('img2_alt').value.trim() || topic);
+  const imgTitle = document.getElementById('img_title').value.trim() || keywords.split(',')[0].trim();
+
+  const previewEl  = document.getElementById(`img${num}-preview`);
+  const actionsEl  = document.getElementById(`img${num}-actions`);
+  const msgEl      = document.getElementById(`msg-img${num}`);
+  if (previewEl) previewEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--accent);font-size:12px">Generuję...</div>';
+  if (msgEl)     msgEl.textContent = 'Regeneruję zdjęcie...';
+
+  try {
+    const r = await fetch('/api/images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cms: site.cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
+        post_id: null, image_num: num,
+        prompt1: prompt, alt1: alt, img_title: imgTitle + (num === 2 ? '-2' : '')
+      })
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    if (d.image_url) {
+      if (previewEl) previewEl.innerHTML = `<img src="${d.image_url}" alt="zdjecie-${num}">`;
+      _imgData[num] = d.image_url;
+      if (actionsEl) actionsEl.style.display = 'flex';
+      if (msgEl) msgEl.textContent = 'Zdjęcie wygenerowane (nowe)';
+    }
+  } catch(e) {
+    if (msgEl) msgEl.textContent = 'Błąd regeneracji: ' + e.message;
+  }
+}
+
+// ─── Update queue pipeline to use img2 and link_pairs ────────────────────────
+// (injected into startQueue via job data – handled in main queue loop)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // KOLEJKA
@@ -1973,24 +2219,34 @@ async function handleQueueCSV(input) {
       if (!topic) { skipped++; continue; }
       // Znajdź witrynę po nazwie
       const siteName = col('site_name') > -1 ? vals[col('site_name')] : '';
-      const site = allSites.find(s => s.name.toLowerCase() === siteName.toLowerCase()) || allSites[0];
+      const site = allSites.find(s => s.url === siteName || s.url.replace(/\/$/, '') === siteName.replace(/\/$/, ''))
+                || allSites.find(s => s.name.toLowerCase() === siteName.toLowerCase())
+                || allSites[0];
       if (!site) { skipped++; continue; }
+      const get = ci => (ci > -1 && ci < vals.length) ? vals[ci].trim() : '';
       queueJobs.push({
         id:           'job_' + Date.now() + '_' + i,
         topic,
-        keywords:     col('keywords')    > -1 ? vals[col('keywords')]    : '',
+        keywords:     get(colMap.keywords),
         site_id:      site.id,
         site_name:    site.name,
-        length:       col('length')      > -1 ? (vals[col('length')] || '4000') : '4000',
-        tone:         col('tone')        > -1 ? (vals[col('tone')]    || 'przyjazny i naturalny') : 'przyjazny i naturalny',
-        scheduled_at: col('scheduled_at')> -1 ? vals[col('scheduled_at')] : '',
-        img_prompt:   col('img1_prompt') > -1 ? vals[col('img1_prompt')] : '',
-        audience:     col('audience')    > -1 ? vals[col('audience')]    : '',
-        extra:        col('extra_info')  > -1 ? vals[col('extra_info')]  : '',
+        length:       get(colMap.length)       || '4000',
+        tone:         get(colMap.tone)         || 'przyjazny i naturalny',
+        scheduled_at: get(colMap.scheduled_at),
+        img_prompt:   get(colMap.img1_prompt),
+        img2_prompt:  get(colMap.img2_prompt),
+        link_pairs:   get(colMap.link_pairs),
+        meta_title:   get(colMap.meta_title),
+        meta_desc:    get(colMap.meta_desc),
+        post_slug:    get(colMap.slug),
+        photos:       parseInt(get(colMap.photos)) || 1,
+        audience:     get(colMap.audience),
+        extra:        get(colMap.extra_info),
         status:       'pending',
         post_url:     '',
         error_msg:    ''
       });
+      saveQueueToStorage();
       added++;
     }
     renderQueue();
@@ -2002,8 +2258,8 @@ async function handleQueueCSV(input) {
 }
 
 function downloadQueueTemplate() {
-  const header = 'topic,keywords,site_name,length,tone,scheduled_at,img1_prompt,audience,extra_info';
-  const example = '"Jak wybrać buty trailowe","buty trailowe,trail running","Górski Biegacz","4000","przyjazny i naturalny","","","biegacze górscy",""';
+  const header = 'topic,keywords,site_name,length,tone,scheduled_at,img1_prompt,img2_prompt,link_pairs,meta_title,meta_desc,slug,photos,audience,extra_info';
+  const example = '"Jak wybrać buty trailowe","buty trailowe,trail running","https://gorskibiegacz.pl","4000","przyjazny i naturalny","","","","","","","",1,"biegacze górscy",""';
   const blob = new Blob(['\uFEFF' + header + '\n' + example], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2036,20 +2292,28 @@ function saveQueueJob() {
     tone:         document.getElementById('qm-tone').value,
     scheduled_at: document.getElementById('qm-scheduled').value,
     img_prompt:   document.getElementById('qm-img').value.trim(),
+    img2_prompt:  document.getElementById('qm-img2').value.trim(),
+    link_pairs:   document.getElementById('qm-links').value.trim(),
+    meta_title:   document.getElementById('qm-meta-title').value.trim(),
+    meta_desc:    document.getElementById('qm-meta-desc').value.trim(),
+    post_slug:    document.getElementById('qm-slug').value.trim(),
+    photos:       parseInt(document.getElementById('qm-photos').value) || 1,
     audience:     '',
     extra:        document.getElementById('qm-extra').value.trim(),
     status:       'pending',
     post_url:     '',
     error_msg:    ''
   });
+  saveQueueToStorage();
   // Reset form
-  ['qm-topic','qm-keywords','qm-img','qm-extra','qm-scheduled'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  ['qm-topic','qm-keywords','qm-img','qm-img2','qm-links','qm-meta-title','qm-meta-desc','qm-slug','qm-extra','qm-scheduled'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   document.getElementById('q-manual-panel').classList.remove('open');
   renderQueue();
 }
 
 function removeQueueJob(id) {
   queueJobs = queueJobs.filter(j => j.id !== id);
+  saveQueueToStorage();
   renderQueue();
 }
 
@@ -2057,6 +2321,7 @@ function clearQueue() {
   if (!confirm('Wyczyścić całą kolejkę? Ukończone zadania nie zostaną usunięte z historii.')) return;
   queueJobs = [];
   queueReport = [];
+  saveQueueToStorage();
   document.getElementById('q-report').style.display = 'none';
   renderQueue();
 }
@@ -2157,7 +2422,7 @@ async function startQueue() {
       const r1 = await callWithFallback('research', {
         topic: job.topic, keywords: job.keywords,
         audience: job.audience || '', extra_info: job.extra || '',
-        researchprompt: ''
+        researchprompt: getMasterprompt('research')
       });
       const research = r1.result || '';
       qStep('research', 'done');
@@ -2173,9 +2438,9 @@ async function startQueue() {
           const r2 = await callWithFallback('write', {
             topic: job.topic, keywords: job.keywords,
             length: job.length || '4000', tone: job.tone || 'przyjazny i naturalny',
-            audience: job.audience || '', link_pairs: '',
+            audience: job.audience || '', link_pairs: job.link_pairs || '',
             extra_info: job.extra || '', research,
-            masterprompt: ''
+            masterprompt: getMasterprompt('write')
           });
           article = cleanHtml(r2.result || '');
           const chars = article.replace(/<[^>]+>/g,' ').trim().length;
@@ -2200,8 +2465,8 @@ async function startQueue() {
         });
         const d = r3.result || {};
         article   = d.corrected_article || article;
-        metaTitle = d.meta_title || job.topic;
-        const metaDesc = d.meta_description || '';
+        metaTitle = job.meta_title || d.meta_title || job.topic;
+        metaDesc  = job.meta_desc  || d.meta_description || '';
         qStep('seo', 'done');
       } catch(e) {
         qStep('seo', 'skip'); qMsg('SEO pominięte – ' + e.message);
@@ -2251,23 +2516,48 @@ async function startQueue() {
 
       if (queueStop) throw new Error('__QUEUE_STOPPED__');
 
-      // 6. ZDJĘCIE
-      qStep('img1', 'running'); qMsg('Generuję zdjęcie...');
+      // 6. ZDJĘCIA
+      const qPhotos   = job.photos !== undefined ? parseInt(job.photos) : 1;
       const mainKw    = (job.keywords.split(',')[0]||'').trim();
+      const imgSlug   = mainKw.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
       const imgPrompt = job.img_prompt || `Profesjonalne zdjęcie do artykułu: ${job.topic}`;
-      try {
-        const r6 = await fetch('/api/images', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cms: site.cms, site_url: site.url,
-            site_login: site.login, site_pass: site.password_enc,
-            post_id: postId, image_num: 1,
-            prompt1: imgPrompt, alt1: metaTitle || job.topic,
-            img_title: mainKw.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
-          })
-        }).then(r => r.json());
-        qStep('img1', r6.error ? 'error' : 'done');
-      } catch(e) { qStep('img1', 'error'); }
+      const img2Prompt= job.img2_prompt || imgPrompt;
+
+      if (qPhotos > 0) {
+        qStep('img1', 'running'); qMsg('Generuję zdjęcie wyróżnione...');
+        try {
+          const r6 = await fetch('/api/images', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cms: site.cms, site_url: site.url,
+              site_login: site.login, site_pass: site.password_enc,
+              post_id: postId, image_num: 1,
+              prompt1: imgPrompt, alt1: metaTitle || job.topic,
+              img_title: imgSlug + '-featured'
+            })
+          }).then(r => r.json());
+          qStep('img1', r6.error ? 'error' : 'done');
+        } catch(e) { qStep('img1', 'error'); }
+      } else {
+        qStep('img1', 'skip');
+      }
+
+      if (qPhotos >= 2) {
+        qMsg('Generuję zdjęcie śródtekstowe...');
+        try {
+          await fetch('/api/images', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cms: site.cms, site_url: site.url,
+              site_login: site.login, site_pass: site.password_enc,
+              post_id: postId, image_num: 2,
+              prompt1: imgPrompt, prompt2: img2Prompt,
+              alt1: metaTitle || job.topic, alt2: metaTitle || job.topic,
+              img_title: imgSlug + '-srodtekstowe'
+            })
+          }).then(r => r.json());
+        } catch(e) { console.warn('img2 queue error:', e.message); }
+      }
 
       // 7. FINALIZACJA – zmień status na docelowy
       qStep('finalize', 'running'); qMsg('Finalizuję...');

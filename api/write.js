@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     const keywords         = body.keywords || '';
     const link_pairs       = body.link_pairs || '';
     const extra_info       = body.extra_info || '';
-    const research         = (body.research || '').substring(0, 1200);
+    const research         = (body.research || '').substring(0, 2500);
     const masterprompt     = body.masterprompt || '';
     const api_provider_raw = body.api_provider || 'gemini';
     const api_provider     = api_provider_raw === 'claude_haiku' ? 'claude' : api_provider_raw;

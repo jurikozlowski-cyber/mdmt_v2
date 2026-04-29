@@ -18,15 +18,25 @@ export default async function handler(req, res) {
   const { method } = req;
 
   try {
-    // GET – pobierz historię (ostatnie 200 wpisów)
+    // GET – pobierz historię z paginacją (20 rekordów na stronę)
     if (method === 'GET') {
-      const { data, error } = await supabase
+      const page  = parseInt(req.query?.page || '1') || 1;
+      const limit = 20;
+      const from  = (page - 1) * limit;
+
+      const { data, error, count } = await supabase
         .from('publications')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(200);
+        .range(from, from + limit - 1);
+
       if (error) throw error;
-      return res.status(200).json({ publications: data });
+      return res.status(200).json({
+        publications: data,
+        page,
+        total: count || 0,
+        pages: Math.ceil((count || 0) / limit)
+      });
     }
 
     // POST – zapisz wynik publikacji
