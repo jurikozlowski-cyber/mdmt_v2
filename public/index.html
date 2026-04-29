@@ -1484,8 +1484,11 @@ async function runPipeline() {
   const img2On       = document.getElementById('img2-toggle').checked;
   // AUTO-PROMPT: jeśli puste – generuj z tematu i fraz
   const mainKw       = keywords.split(',')[0].trim();
-  const img1_prompt  = document.getElementById('img1_prompt').value.trim()  || `Profesjonalne zdjęcie do artykułu o temacie: ${topic}`;
-  const img2_prompt  = document.getElementById('img2_prompt').value.trim()  || document.getElementById('img1_prompt').value.trim() || `Zdjęcie śródtekstowe do artykułu: ${topic}`;
+  const kwContext    = keywords.split(',').slice(0,3).map(k => k.replace(/x\d+$/i,'').trim()).filter(Boolean).join(', ');
+  const autoPrompt1  = `Profesjonalne zdjęcie do artykułu: ${topic}. Kontekst: ${kwContext}.`;
+  const autoPrompt2  = `Zdjęcie śródtekstowe do artykułu: ${topic}. Kontekst: ${kwContext}.`;
+  const img1_prompt  = document.getElementById('img1_prompt').value.trim()  || autoPrompt1;
+  const img2_prompt  = document.getElementById('img2_prompt').value.trim()  || autoPrompt2;
   const mainKwClean  = mainKw.replace(/x\d+$/i,'').trim();
   const secondKw     = keywords.split(',').length > 1 ? keywords.split(',')[1].trim().replace(/x\d+$/i,'').trim() : mainKwClean;
   const autoAlt1     = `${mainKwClean} – ${topic}`.substring(0, 100);
@@ -2553,8 +2556,9 @@ async function startQueue() {
       const mainKw     = (job.keywords.split(',')[0]||'').trim().replace(/x\d+$/i,'').trim();
       const secondKw   = job.keywords.split(',').length > 1 ? job.keywords.split(',')[1].trim().replace(/x\d+$/i,'').trim() : mainKw;
       const imgSlug    = mainKw.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
-      const imgPrompt  = job.img_prompt  || `Profesjonalne zdjęcie do artykułu: ${job.topic}`;
-      const img2Prompt = job.img2_prompt || imgPrompt;
+      const kwCtx      = job.keywords.split(',').slice(0,3).map(k => k.replace(/x\d+$/i,'').trim()).filter(Boolean).join(', ');
+      const imgPrompt  = job.img_prompt  || `Profesjonalne zdjęcie do artykułu: ${job.topic}. Kontekst: ${kwCtx}.`;
+      const img2Prompt = job.img2_prompt || `Zdjęcie śródtekstowe do artykułu: ${job.topic}. Kontekst: ${kwCtx}.`;
       // SEO alts: fraza – temat (max 100 znaków)
       const autoAlt1   = `${mainKw} – ${job.topic}`.substring(0, 100);
       const autoAlt2   = `${secondKw} – ${job.topic}`.substring(0, 100);
