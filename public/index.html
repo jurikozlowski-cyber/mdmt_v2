@@ -224,6 +224,10 @@ input[type="datetime-local"] { color-scheme: dark; }
     <button class="nav-btn" onclick="nav('settings')">⚙️ Ustawienia</button>
   </nav>
 </header>
+<div id="quota-notice" style="display:none;background:rgba(245,158,11,0.12);border-bottom:1px solid rgba(245,158,11,0.3);padding:10px 32px;font-size:13px;color:var(--warning);display:none">
+  <span id="quota-notice-text"></span>
+  <button onclick="document.getElementById('quota-notice').style.display='none'" style="float:right;background:none;border:none;color:var(--warning);cursor:pointer;font-size:16px">✕</button>
+</div>
 
 <main class="main">
 
@@ -1543,6 +1547,7 @@ async function runPipeline() {
     setOut('research', research.substring(0, 500) + (research.length > 500 ? '…' : ''));
   } catch(e) {
     if (isAbort(e)) return endPipeline();
+    if (isQuotaError(e.message)) showQuotaNotice(getQuotaMessage('gemini ' + e.message));
     setStep('research', 'error', e.message);
     return endPipeline(false, e.message, {topic, keywords, site, article, metaTitle});
   }
@@ -1583,6 +1588,7 @@ async function runPipeline() {
       }
     } catch(e) {
       if (isAbort(e)) return endPipeline();
+      if (isQuotaError(e.message)) showQuotaNotice(getQuotaMessage('gemini ' + e.message));
       if (attempt < 3) { await delay(2000); continue; }
       setStep('write', 'error', 'Błąd pisania: ' + e.message);
       return endPipeline(false, e.message, {topic, keywords, site, article, metaTitle});
@@ -1799,6 +1805,31 @@ function isOverloadError(msg) {
   return m.includes('overload') || m.includes('high demand') || m.includes('503') ||
          m.includes('529') || m.includes('capacity') || m.includes('unavailable') ||
          m.includes('przeciążon') || m.includes('try again later');
+}
+
+function isQuotaError(msg) {
+  if (!msg) return false;
+  const m = msg.toLowerCase();
+  return m.includes('quota') || m.includes('insufficient_quota') ||
+         m.includes('rate limit') || m.includes('429') ||
+         m.includes('billing') || m.includes('exceeded') ||
+         m.includes('resource_exhausted') || m.includes('you exceeded') ||
+         m.includes('limit reached') || m.includes('usage limit');
+}
+
+function getQuotaMessage(msg) {
+  if (!msg) return null;
+  const m = msg.toLowerCase();
+  if (m.includes('gemini') || m.includes('google')) {
+    return '⚠️ Limit Gemini API wyczerpany. Sprawdź: aistudio.google.com → Usage';
+  }
+  if (m.includes('anthropic') || m.includes('claude') || m.includes('overload')) {
+    return '⚠️ Limit Claude API wyczerpany. Sprawdź: console.anthropic.com → Usage';
+  }
+  if (m.includes('openai') || m.includes('insufficient_quota') || m.includes('billing')) {
+    return '⚠️ Limit OpenAI API wyczerpany lub brak środków. Sprawdź: platform.openai.com → Billing';
+  }
+  return '⚠️ Limit API wyczerpany – sprawdź saldo konta dostawcy AI.';
 }
 
 function validateHtml(text) {
@@ -2413,7 +2444,8 @@ async function callWithFallback(endpoint, body, overrideProvider) {
   ];
 
   for (let i = 0; i < ordered.length; i++) {
-    const model = ordered[i];
+    const model    = ordered[i];
+    const nextName = i < ordered.length - 1 ? ordered[i+1].api_provider : null;
     try {
       const r = await fetch(`/api/${endpoint}`, {
         method: 'POST',
@@ -2422,16 +2454,28 @@ async function callWithFallback(endpoint, body, overrideProvider) {
       });
       const d = await r.json();
       if (d.error) {
-        if (isOverloadError(d.error) && i < ordered.length - 1) {
-          qMsg(`Model ${model.api_provider} przeciążony – przełączam na ${ordered[i+1].api_provider}...`);
+        if (isQuotaError(d.error)) {
+          const qm = getQuotaMessage(model.api_provider + ' ' + d.error);
+          showQuotaNotice(qm);
+          if (nextName) { qMsg(`${qm} – próbuję ${nextName}...`); continue; }
+          throw new Error(qm);
+        }
+        if (isOverloadError(d.error) && nextName) {
+          qMsg(`Model ${model.api_provider} przeciążony – przełączam na ${nextName}...`);
           continue;
         }
         throw new Error(d.error);
       }
       return d;
     } catch(e) {
-      if (isOverloadError(e.message) && i < ordered.length - 1) {
-        qMsg(`Model ${model.api_provider} błąd – przełączam na ${ordered[i+1].api_provider}...`);
+      if (isQuotaError(e.message)) {
+        const qm = getQuotaMessage(model.api_provider + ' ' + e.message);
+        showQuotaNotice(qm);
+        if (nextName) { qMsg(`${qm} – próbuję ${nextName}...`); continue; }
+        throw new Error(qm);
+      }
+      if (isOverloadError(e.message) && nextName) {
+        qMsg(`Model ${model.api_provider} błąd – przełączam na ${nextName}...`);
         continue;
       }
       throw e;
@@ -2791,6 +2835,16 @@ function retryPipeline() {
   document.getElementById('retry-btn').style.display = 'none';
   document.getElementById('result-box').classList.remove('on');
   runPipeline();
+}
+
+function showQuotaNotice(msg) {
+  const el   = document.getElementById('quota-notice');
+  const text = document.getElementById('quota-notice-text');
+  if (!el || !text) return;
+  text.textContent = msg;
+  el.style.display = 'block';
+  // Auto-hide po 30s
+  setTimeout(() => { el.style.display = 'none'; }, 30000);
 }
 
 function updateQueueFallbackHint() {
