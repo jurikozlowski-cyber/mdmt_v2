@@ -21,7 +21,7 @@ async function withRetry(fn) {
 
 // ─── Generowanie obrazu (Gemini) ─────────────────────────────────────────────
 
-async function generateImage(promptText, GEMINI_KEY) {
+async function generateImageGemini(promptText, GEMINI_KEY) {
   const fullPrompt = promptText + '. Zdjęcie BEZ napisów, tekstów, liter, cyfr, watermarków. Profesjonalna fotografia, naturalne oświetlenie.';
   const payload = {
     contents: [{ parts: [{ text: fullPrompt }] }],
@@ -32,11 +32,52 @@ async function generateImage(promptText, GEMINI_KEY) {
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
     ).then(r => r.json())
   );
-  if (data.error) throw new Error(`[GENEROWANIE] Gemini: ${data.error.message}`);
+  if (data.error) throw new Error(`Gemini: ${data.error.message}`);
   const parts   = data.candidates?.[0]?.content?.parts || [];
   const imgPart = parts.find(p => p.inlineData);
-  if (!imgPart) throw new Error('[GENEROWANIE] Gemini nie zwrócił obrazu');
+  if (!imgPart) throw new Error('Gemini nie zwrócił obrazu');
   return { data: imgPart.inlineData.data, mimeType: imgPart.inlineData.mimeType };
+}
+
+async function generateImageDalle(promptText, OPENAI_KEY) {
+  // DALL-E 3 nie obsługuje natywnie 16:9 – używamy 1792x1024 (najbliższe 16:9)
+  const fullPrompt = promptText + '. No text, no letters, no watermarks, no numbers. Professional photography, natural lighting.';
+  const res  = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENAI_KEY}`
+    },
+    body: JSON.stringify({
+      model:   'dall-e-3',
+      prompt:  fullPrompt,
+      n:       1,
+      size:    '1792x1024',
+      quality: 'standard',
+      response_format: 'b64_json'
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(`DALL-E 3: ${data.error.message}`);
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) throw new Error('DALL-E 3 nie zwrócił obrazu');
+  return { data: b64, mimeType: 'image/png' };
+}
+
+async function generateImage(promptText, GEMINI_KEY, OPENAI_KEY) {
+  // Próbuj Gemini najpierw, fallback na DALL-E 3
+  try {
+    return await generateImageGemini(promptText, GEMINI_KEY);
+  } catch(e) {
+    const isOverload = e.message.includes('503') || e.message.includes('500') ||
+                       e.message.includes('overload') || e.message.includes('unavailable') ||
+                       e.message.includes('Internal') || e.message.includes('quota');
+    if (isOverload && OPENAI_KEY) {
+      console.log(`[GENEROWANIE] Gemini błąd (${e.message}) – fallback na DALL-E 3`);
+      return await generateImageDalle(promptText, OPENAI_KEY);
+    }
+    throw new Error(`[GENEROWANIE] Gemini: ${e.message}`);
+  }
 }
 
 // ─── Kompresja (TinyPNG) ──────────────────────────────────────────────────────
@@ -264,14 +305,15 @@ export default async function handler(req, res) {
     const image_num  = body.image_num || 1;
 
     const GEMINI_KEY  = process.env.GEMINI_API_KEY;
+    const OPENAI_KEY  = process.env.OPENAI_API_KEY;
     const TINYPNG_KEY = process.env.TINYPNG_API_KEY;
-    if (!GEMINI_KEY) throw new Error('Brak klucza GEMINI_API_KEY');
+    if (!GEMINI_KEY && !OPENAI_KEY) throw new Error('Brak klucza GEMINI_API_KEY lub OPENAI_API_KEY');
 
     const baseUrl = site_url.replace(/\/$/, '');
 
     // ── Zdjęcie 1 (featured / wyróżnione) ────────────────
     if (image_num === 1) {
-      const img1        = await generateImage(prompt, GEMINI_KEY);
+      const img1        = await generateImage(prompt, GEMINI_KEY, OPENAI_KEY);
       const compressed1 = await compressImage(img1.data, img1.mimeType, TINYPNG_KEY);
       let   media1      = null;
 
@@ -364,7 +406,7 @@ export default async function handler(req, res) {
 
     // ── Zdjęcie 2 (śródtekstowe) ──────────────────────────
     const promptToUse = prompt2 || prompt;
-    const img2        = await generateImage(promptToUse, GEMINI_KEY);
+    const img2        = await generateImage(promptToUse, GEMINI_KEY, OPENAI_KEY);
     const compressed2 = await compressImage(img2.data, img2.mimeType, TINYPNG_KEY);
     let   media2      = null;
 
