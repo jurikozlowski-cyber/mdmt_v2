@@ -218,10 +218,15 @@ async function uploadToDrupal(imgData, mimeType, altTxt, filename, baseUrl, logi
   let fileData7;
   try { fileData7 = JSON.parse(fileText7); } catch { throw new Error(`[DODAWANIE DRUPAL 7] Błąd pliku: ${fileText7.substring(0,200)}`); }
 
+  if (!fileData7.fid) throw new Error(`[DODAWANIE DRUPAL 7] Brak fid: ${fileText7.substring(0,200)}`);
+
+  const fid    = fileData7.fid;
+  const fileUrl7 = fileData7.uri ? `${baseUrl}/${fileData7.uri.replace('public://', 'sites/default/files/')}` : `${baseUrl}/sites/default/files/${fname}`;
+
+  // Wyloguj
   try { await fetch(`${baseUrl}/api/user/logout.json`, { method: 'POST', headers: d7H }); } catch(e) {}
 
-  if (!fileData7.fid) throw new Error(`[DODAWANIE DRUPAL 7] Brak fid: ${fileText7.substring(0,200)}`);
-  return { id: fileData7.fid, url: `${baseUrl}/sites/default/files/${fname}` };
+  return { id: fid, url: fileUrl7, fid };
 }
 
 
@@ -288,25 +293,63 @@ export default async function handler(req, res) {
         }
 
       } else if (cms === 'drupal') {
-        media1 = await uploadToDrupal(compressed1.data, compressed1.mimeType, alt_text, 'featured', baseUrl, site_login, site_pass);
-        // Drupal: przypisz plik do node przez PATCH
+        media1 = await uploadToDrupal(compressed1.data, compressed1.mimeType, alt_text, img_title, 'featured', baseUrl, site_login, site_pass);
         if (media1?.id && post_id) {
           const creds = Buffer.from(`${site_login}:${site_pass}`).toString('base64');
-          await fetch(`${baseUrl}/jsonapi/node/article/${post_id}`, {
-            method: 'PATCH',
-            headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/vnd.api+json', 'Accept': 'application/vnd.api+json' },
-            body: JSON.stringify({
-              data: {
-                type: 'node--article',
-                id: post_id,
-                relationships: {
-                  field_image: { data: { type: 'file--file', id: media1.id, meta: { alt: alt_text, title: img_title } } }
-                }
-              }
-            })
-          });
+          const d8ok  = await fetch(`${baseUrl}/jsonapi`, {
+            headers: { 'Authorization': `Basic ${creds}`, 'Accept': 'application/vnd.api+json' },
+            signal: AbortSignal.timeout(3000)
+          }).then(r => r.ok).catch(() => false);
+
+          if (d8ok) {
+            await fetch(`${baseUrl}/jsonapi/node/article/${post_id}`, {
+              method: 'PATCH',
+              headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/vnd.api+json', 'Accept': 'application/vnd.api+json' },
+              body: JSON.stringify({ data: { type: 'node--article', id: post_id, relationships: { field_image: { data: { type: 'file--file', id: media1.id, meta: { alt: alt_text, title: img_title } } } } } })
+            });
+          } else {
+            // D7 – wstaw zdjęcie jako <img> na początku treści node
+            const lr = await fetch(`${baseUrl}/api/user/login.json`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+              body: JSON.stringify({ username: site_login, password: site_pass })
+            });
+            const ld = await lr.json();
+            if (ld.sessid) {
+              const h7 = {
+                'Content-Type': 'application/json', 'Accept': 'application/json',
+                'Cookie': `${ld.session_name}=${ld.sessid}`,
+                'X-CSRF-Token': ld.token || ''
+              };
+              // Pobierz aktualną treść node
+              const nodeRes = await fetch(`${baseUrl}/api/node/${post_id}.json`, {
+                headers: h7
+              });
+              const nodeData = await nodeRes.json();
+              const currentBody = nodeData?.body?.und?.[0]?.value || '';
+              const imgTag = `<img src="${media1.url}" alt="${alt_text}" title="${img_title}" style="max-width:100%;height:auto;display:block;margin:0 auto 20px;" />`;
+              const newBody = imgTag + currentBody;
+              // Zaktualizuj node z obrazem na początku treści
+              await fetch(`${baseUrl}/api/node/${post_id}.json`, {
+                method: 'PUT',
+                headers: h7,
+                body: JSON.stringify({
+                  body: {
+                    und: [{
+                      value: newBody,
+                      summary: '',
+                      format: 'full_html',
+                      safe_value: newBody,
+                      safe_summary: ''
+                    }]
+                  }
+                })
+              }).catch(e => console.log('D7 img inject:', e.message));
+              await fetch(`${baseUrl}/api/user/logout.json`, { method: 'POST', headers: h7 }).catch(() => {});
+            }
+          }
         }
-      }
+      }}
 
       return res.status(200).json({ success: true, media_id: media1?.id, image_url: media1?.url, compressed: compressed1.compressed });
     }
@@ -345,6 +388,59 @@ export default async function handler(req, res) {
 
     } else if (cms === 'drupal') {
       media2 = await uploadToDrupal(compressed2.data, compressed2.mimeType, alt_text2 || alt_text, 'srodtekstowe', baseUrl, site_login, site_pass);
+      // D7 – wstaw zdjęcie śródtekstowe w połowie treści
+      if (media2?.url && post_id) {
+        const d8ok = await fetch(`${baseUrl}/jsonapi`, {
+          headers: { 'Authorization': `Basic ${Buffer.from(`${site_login}:${site_pass}`).toString('base64')}`, 'Accept': 'application/vnd.api+json' },
+          signal: AbortSignal.timeout(3000)
+        }).then(r => r.ok).catch(() => false);
+
+        if (!d8ok) {
+          // Drupal 7 – zaloguj, pobierz treść, wstaw img w połowie
+          const lr = await fetch(`${baseUrl}/api/user/login.json`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ username: site_login, password: site_pass })
+          });
+          const ld = await lr.json();
+          if (ld.sessid) {
+            const h7 = {
+              'Content-Type': 'application/json', 'Accept': 'application/json',
+              'Cookie': `${ld.session_name}=${ld.sessid}`,
+              'X-CSRF-Token': ld.token || ''
+            };
+            const nodeRes  = await fetch(`${baseUrl}/api/node/${post_id}.json`, { headers: h7 });
+            const nodeData = await nodeRes.json();
+            let currentBody = nodeData?.body?.und?.[0]?.value || '';
+            if (currentBody) {
+              // Znajdź środek artykułu po tagach zamykających
+              const closingTags = [...currentBody.matchAll(/<\/(p|h[2-6]|ul|ol)>/gi)];
+              const midTag      = closingTags[Math.floor(closingTags.length / 2)];
+              const insertPos   = midTag ? midTag.index + midTag[0].length : Math.floor(currentBody.length / 2);
+              const imgTag      = `
+<img src="${media2.url}" alt="${alt_text2 || alt_text}" style="max-width:100%;height:auto;display:block;margin:20px auto;" />
+`;
+              currentBody       = currentBody.substring(0, insertPos) + imgTag + currentBody.substring(insertPos);
+              await fetch(`${baseUrl}/api/node/${post_id}.json`, {
+                method: 'PUT',
+                headers: h7,
+                body: JSON.stringify({
+                  body: {
+                    und: [{
+                      value: currentBody,
+                      summary: '',
+                      format: 'full_html',
+                      safe_value: currentBody,
+                      safe_summary: ''
+                    }]
+                  }
+                })
+              }).catch(e => console.log('D7 img2 inject:', e.message));
+              await fetch(`${baseUrl}/api/user/logout.json`, { method: 'POST', headers: h7 }).catch(() => {});
+            }
+          }
+        }
+      }
     }
 
     return res.status(200).json({ success: true, media_id: media2?.id, image_url: media2?.url, compressed: compressed2.compressed });
