@@ -171,19 +171,20 @@ async function publishDrupal7({ baseUrl, login, pass, title, content, status, me
   };
 
   // Krok 3: Utwórz node
-  // Drupal 7 body field – format zależy od instalacji
-  // Próbujemy 'filtered_html' jako najbardziej universal ny format w D7
   const nodePayload = {
-    type:   'article',
+    type:     'article',
     title,
+    language: 'und',
     body: {
       und: [{
-        value:  content || '',
-        format: 'filtered_html'
+        value:   content || '',
+        summary: '',
+        format:  'full_html',
+        safe_value: content || '',
+        safe_summary: ''
       }]
     },
-    status: status === 'publish' ? 1 : 0,
-    language: 'und'
+    status: status === 'publish' ? 1 : 0
   };
 
   if (scheduled_at) {
