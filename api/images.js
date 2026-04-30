@@ -30,7 +30,11 @@ async function generateImageGemini(promptText, GEMINI_KEY) {
   const data = await withRetry(() =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_KEY}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
-    ).then(r => r.json())
+    ).then(async r => {
+      const text = await r.text();
+      try { return JSON.parse(text); }
+      catch { throw new Error(`503: ${text.substring(0, 80)}`); }
+    })
   );
   if (data.error) throw new Error(`Gemini: ${data.error.message}`);
   const parts   = data.candidates?.[0]?.content?.parts || [];
@@ -71,7 +75,9 @@ async function generateImage(promptText, GEMINI_KEY, OPENAI_KEY) {
   } catch(e) {
     const isOverload = e.message.includes('503') || e.message.includes('500') ||
                        e.message.includes('overload') || e.message.includes('unavailable') ||
-                       e.message.includes('Internal') || e.message.includes('quota');
+                       e.message.includes('Internal') || e.message.includes('quota') ||
+                       e.message.includes('DOCTYPE') || e.message.includes('server e') ||
+                       e.message.includes('not valid JSON') || e.message.includes('<!');
     if (isOverload && OPENAI_KEY) {
       console.log(`[GENEROWANIE] Gemini błąd (${e.message}) – fallback na DALL-E 3`);
       return await generateImageDalle(promptText, OPENAI_KEY);
