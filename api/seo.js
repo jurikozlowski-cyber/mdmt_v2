@@ -87,6 +87,24 @@ export default async function handler(req, res) {
     let parsed;
     try { parsed = JSON.parse(raw.replace(/```json|```/g, '').trim()); }
     catch { parsed = { meta_title: topic.substring(0, 60), meta_description: main_keyword.substring(0, 155), seo_notes: 'Meta dane wygenerowane automatycznie.' }; }
+
+    // Przytnij do limitów SEO
+    if (parsed.meta_title)       parsed.meta_title       = parsed.meta_title.substring(0, 60).trim();
+    if (parsed.meta_description) parsed.meta_description = parsed.meta_description.substring(0, 155).trim();
+
+    // Fallback dla meta_description – pierwszy akapit artykułu
+    if (!parsed.meta_description || parsed.meta_description.length < 20) {
+      const firstP = article.match(/<p[^>]*>(.*?)<\/p>/i);
+      if (firstP) {
+        parsed.meta_description = firstP[1].replace(/<[^>]+>/g,'').substring(0, 155).trim();
+      }
+    }
+
+    // Fallback dla meta_title – fraza główna + temat
+    if (!parsed.meta_title || parsed.meta_title.length < 5) {
+      parsed.meta_title = `${main_keyword} - ${topic}`.substring(0, 60).trim();
+    }
+
     parsed.corrected_article = article;
     return res.status(200).json({ result: parsed });
 

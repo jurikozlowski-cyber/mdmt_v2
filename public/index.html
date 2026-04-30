@@ -689,9 +689,18 @@ input[type="datetime-local"] { color-scheme: dark; }
           <option value="30000">30 sekund</option>
         </select>
       </div>
+        <div class="field" style="margin:0;flex:0 0 auto">
+        <label style="display:block;margin-bottom:4px">Model główny kolejki</label>
+        <select id="q-model" style="width:auto;padding:6px 10px" onchange="updateQueueFallbackHint()">
+          <option value="gemini">Gemini 2.5 Flash (domyślny)</option>
+          <option value="claude">Claude Sonnet</option>
+          <option value="claude_haiku">Claude Haiku</option>
+          <option value="openai">GPT-4o-mini</option>
+        </select>
+      </div>
       <div class="field" style="margin:0;flex:0 0 auto">
-        <label style="display:block;margin-bottom:4px">Fallback modeli przy błędzie</label>
-        <div style="font-size:12px;color:var(--muted);padding-top:4px">Gemini → Sonnet → Haiku → GPT-4o-mini</div>
+        <label style="display:block;margin-bottom:4px">Fallback przy błędzie</label>
+        <div style="font-size:12px;color:var(--muted);padding-top:4px" id="q-fallback-hint">Gemini → Sonnet → Haiku → GPT-4o-mini</div>
       </div>
       <div id="q-progress-info" style="display:none;margin-left:auto;font-size:13px;color:var(--accent)">
         <span id="q-progress-text">0/0 ukończonych</span>
@@ -1499,13 +1508,15 @@ async function runPipeline() {
   const kwContext     = keywords.split(',').slice(0,3).map(k => k.replace(/x\d+$/i,'').trim()).filter(Boolean).join(', ');
   const autoPrompt1   = `Profesjonalne zdjęcie do artykułu: ${topic}. Kontekst: ${kwContext}.`;
   const autoPrompt2   = `Zdjęcie śródtekstowe do artykułu: ${topic}. Kontekst: ${kwContext}.`;
-  const autoAlt1      = `${mainKwClean} – ${topic}`.substring(0, 100);
-  const autoAlt2      = `${secondKw} – ${topic}`.substring(0, 100);
+  // Alt = fraza, tytuł zdjęcia = tytuł wpisu
+  const autoAlt1      = mainKwClean.substring(0, 100);
+  const autoAlt2      = secondKw.substring(0, 100);
+  const autoImgTitle  = topic.substring(0, 100);
   const img1_prompt   = document.getElementById('img1_prompt').value.trim()  || autoPrompt1;
   const img2_prompt   = document.getElementById('img2_prompt').value.trim()  || autoPrompt2;
   const img1_alt      = document.getElementById('img1_alt').value.trim()     || autoAlt1;
   const img2_alt      = document.getElementById('img2_alt').value.trim()     || autoAlt2;
-  const img_title     = document.getElementById('img_title').value.trim()    || mainKwClean.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  const img_title     = document.getElementById('img_title').value.trim()    || autoImgTitle;
   const img2_title    = document.getElementById('img2_title').value.trim()   || (img_title + '-2');
   const status_val    = scheduled_at ? 'future' : (site.default_status || 'draft');
   const targetChars   = parseInt(length) || 3000;
@@ -2390,13 +2401,12 @@ const FALLBACK_MODELS = [
   { api_provider: 'openai',      api_model: 'gpt-4o-mini' }
 ];
 
-async function callWithFallback(endpoint, body) {
-  const settings = getSettings();
-  const startProvider = settings.api_provider || 'gemini';
-  const startModel    = settings.api_model    || '';
+async function callWithFallback(endpoint, body, overrideProvider) {
+  const settings      = getSettings();
+  const startProvider = overrideProvider || settings.api_provider || 'gemini';
+  const startModel    = overrideProvider ? '' : (settings.api_model || '');
 
   // Zbuduj listę – zacznij od wybranego modelu
-  const startIdx = FALLBACK_MODELS.findIndex(m => m.api_provider === startProvider) ?? 0;
   const ordered  = [
     { api_provider: startProvider, api_model: startModel },
     ...FALLBACK_MODELS.filter(m => m.api_provider !== startProvider)
@@ -2446,7 +2456,8 @@ async function startQueue() {
   document.getElementById('q-progress-info').style.display = 'block';
   updateQueueProgress();
 
-  const delay_ms = parseInt(document.getElementById('q-delay').value) || 8000;
+  const delay_ms   = parseInt(document.getElementById('q-delay').value) || 8000;
+  const qMainModel = document.getElementById('q-model')?.value || 'gemini';
 
   for (let i = 0; i < queueJobs.length; i++) {
     const job = queueJobs[i];
@@ -2482,7 +2493,7 @@ async function startQueue() {
         topic: job.topic, keywords: job.keywords,
         audience: job.audience || '', extra_info: job.extra || '',
         researchprompt: getMasterprompt('research')
-      });
+      }, qMainModel);
       const research = r1.result || '';
       qStep('research', 'done');
 
@@ -2500,7 +2511,7 @@ async function startQueue() {
             audience: job.audience || '', link_pairs: job.link_pairs || '',
             extra_info: job.extra || '', research,
             masterprompt: getMasterprompt('write')
-          });
+          }, qMainModel);
           article = cleanHtml(r2.result || '');
           const chars = article.replace(/<[^>]+>/g,' ').trim().length;
           if (chars >= targetChars * 0.6) { writeOk = true; break; }
@@ -2521,7 +2532,7 @@ async function startQueue() {
         const r3 = await callWithFallback('seo', {
           article, topic: job.topic,
           main_keyword: (job.keywords.split(',')[0]||'').trim()
-        });
+        }, qMainModel);
         const d = r3.result || {};
         article   = d.corrected_article || article;
         metaTitle = job.meta_title || d.meta_title || job.topic;
@@ -2562,7 +2573,7 @@ async function startQueue() {
       // 5. KOREKTA
       qStep('proofread', 'running'); qMsg('Korekta językowa...');
       try {
-        const r5 = await callWithFallback('proofread', { article, keywords: job.keywords });
+        const r5 = await callWithFallback('proofread', { article, keywords: job.keywords }, qMainModel);
         const proof = cleanHtml(r5.result || '');
         const lenOk  = proof.length >= article.length * 0.8;
         const pOk    = Math.abs((proof.match(/<p[^>]*>/gi)||[]).length - (article.match(/<p[^>]*>/gi)||[]).length) <= 2;
@@ -2587,9 +2598,10 @@ async function startQueue() {
       const kwCtx      = job.keywords.split(',').slice(0,3).map(k => k.replace(/x\d+$/i,'').trim()).filter(Boolean).join(', ');
       const imgPrompt  = job.img_prompt  || `Profesjonalne zdjęcie do artykułu: ${job.topic}. Kontekst: ${kwCtx}.`;
       const img2Prompt = job.img2_prompt || `Zdjęcie śródtekstowe do artykułu: ${job.topic}. Kontekst: ${kwCtx}.`;
-      // SEO alts: fraza – temat (max 100 znaków)
-      const autoAlt1   = `${mainKw} – ${job.topic}`.substring(0, 100);
-      const autoAlt2   = `${secondKw} – ${job.topic}`.substring(0, 100);
+      // Alt = fraza kluczowa, tytuł = tytuł wpisu
+      const autoAlt1     = mainKw.substring(0, 100);
+      const autoAlt2     = secondKw.substring(0, 100);
+      const autoImgTitle = job.topic.substring(0, 100);
 
       if (qPhotos > 0) {
         qStep('img1', 'running'); qMsg('Generuję zdjęcie wyróżnione...');
@@ -2601,7 +2613,7 @@ async function startQueue() {
               site_login: site.login, site_pass: site.password_enc,
               post_id: postId, image_num: 1,
               prompt1: imgPrompt, alt1: autoAlt1,
-              img_title: imgSlug + '-featured'
+              img_title: autoImgTitle
             })
           }).then(r => r.json());
           qStep('img1', r6.error ? 'error' : 'done');
@@ -2621,7 +2633,7 @@ async function startQueue() {
               post_id: postId, image_num: 2,
               prompt1: imgPrompt, prompt2: img2Prompt,
               alt1: autoAlt1, alt2: autoAlt2,
-              img_title: imgSlug + '-srodtekstowe'
+              img_title: autoImgTitle
             })
           }).then(r => r.json());
         } catch(e) { console.warn('img2 queue error:', e.message); }
@@ -2779,6 +2791,15 @@ function retryPipeline() {
   document.getElementById('retry-btn').style.display = 'none';
   document.getElementById('result-box').classList.remove('on');
   runPipeline();
+}
+
+function updateQueueFallbackHint() {
+  const model = document.getElementById('q-model')?.value || 'gemini';
+  const labels = { gemini: 'Gemini', claude: 'Sonnet', claude_haiku: 'Haiku', openai: 'GPT-4o-mini' };
+  const all    = ['gemini','claude','claude_haiku','openai'];
+  const order  = [model, ...all.filter(m => m !== model)].map(m => labels[m]);
+  const hint   = document.getElementById('q-fallback-hint');
+  if (hint) hint.textContent = order.join(' → ');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
