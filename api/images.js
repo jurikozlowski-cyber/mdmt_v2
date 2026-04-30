@@ -27,15 +27,17 @@ async function generateImageGemini(promptText, GEMINI_KEY) {
     contents: [{ parts: [{ text: fullPrompt }] }],
     generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '16:9' } }
   };
-  const data = await withRetry(() =>
-    fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_KEY}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
-    ).then(async r => {
-      const text = await r.text();
-      try { return JSON.parse(text); }
-      catch { throw new Error(`503: ${text.substring(0, 80)}`); }
-    })
+
+  // Bez withRetry – błąd musi przejść do generateImage żeby uruchomić fallback DALL-E 3
+  const res  = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_KEY}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
   );
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); }
+  catch { throw new Error(`Gemini niedostępny (${res.status}): ${text.substring(0, 60)}`); }
+
   if (data.error) throw new Error(`Gemini: ${data.error.message}`);
   const parts   = data.candidates?.[0]?.content?.parts || [];
   const imgPart = parts.find(p => p.inlineData);
@@ -69,21 +71,29 @@ async function generateImageDalle(promptText, OPENAI_KEY) {
 }
 
 async function generateImage(promptText, GEMINI_KEY, OPENAI_KEY) {
-  // Próbuj Gemini najpierw, fallback na DALL-E 3
-  try {
-    return await generateImageGemini(promptText, GEMINI_KEY);
-  } catch(e) {
-    const isOverload = e.message.includes('503') || e.message.includes('500') ||
-                       e.message.includes('overload') || e.message.includes('unavailable') ||
-                       e.message.includes('Internal') || e.message.includes('quota') ||
-                       e.message.includes('DOCTYPE') || e.message.includes('server e') ||
-                       e.message.includes('not valid JSON') || e.message.includes('<!');
-    if (isOverload && OPENAI_KEY) {
-      console.log(`[GENEROWANIE] Gemini błąd (${e.message}) – fallback na DALL-E 3`);
-      return await generateImageDalle(promptText, OPENAI_KEY);
+  // 2 próby Gemini
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      if (attempt > 1) await new Promise(r => setTimeout(r, 3000));
+      return await generateImageGemini(promptText, GEMINI_KEY);
+    } catch(e) {
+      console.log(`[GENEROWANIE] Gemini próba ${attempt}/2 błąd: ${e.message}`);
     }
-    throw new Error(`[GENEROWANIE] Gemini: ${e.message}`);
   }
+  // 2 próby DALL-E 3
+  if (OPENAI_KEY) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        if (attempt > 1) await new Promise(r => setTimeout(r, 3000));
+        console.log(`[GENEROWANIE] DALL-E 3 próba ${attempt}/2`);
+        return await generateImageDalle(promptText, OPENAI_KEY);
+      } catch(e) {
+        console.log(`[GENEROWANIE] DALL-E 3 próba ${attempt}/2 błąd: ${e.message}`);
+        if (attempt === 2) throw new Error(`[GENEROWANIE] Gemini i DALL-E 3 niedostępne: ${e.message}`);
+      }
+    }
+  }
+  throw new Error('[GENEROWANIE] Wszystkie modele obrazów niedostępne');
 }
 
 // ─── Kompresja (TinyPNG) ──────────────────────────────────────────────────────
