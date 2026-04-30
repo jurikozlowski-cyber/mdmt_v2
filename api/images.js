@@ -49,6 +49,7 @@ async function compressImage(imgBase64, mimeType, TINYPNG_KEY) {
 
   const buffer     = Buffer.from(imgBase64, 'base64');
   const tinifyAuth = 'Basic ' + Buffer.from(`api:${TINYPNG_KEY}`).toString('base64');
+  try {
 
   const shrinkRes = await fetch('https://api.tinify.com/shrink', {
     method: 'POST',
@@ -57,7 +58,8 @@ async function compressImage(imgBase64, mimeType, TINYPNG_KEY) {
   });
   if (!shrinkRes.ok) {
     const errText = await shrinkRes.text();
-    throw new Error(`[KOMPRESJA] TinyPNG błąd ${shrinkRes.status}: ${errText}`);
+    console.log(`[KOMPRESJA] TinyPNG błąd ${shrinkRes.status} – używam oryginału`);
+    return { data: imgBase64, mimeType, compressed: false, skipped: true };
   }
   const location = shrinkRes.headers.get('location');
   if (!location) throw new Error('[KOMPRESJA] TinyPNG nie zwrócił lokalizacji');
@@ -93,6 +95,10 @@ async function compressImage(imgBase64, mimeType, TINYPNG_KEY) {
   }
 
   return { data: compressedBuffer.toString('base64'), mimeType: 'image/jpeg', compressed: true };
+  } catch(e) {
+    console.log('[KOMPRESJA] Błąd TinyPNG – używam oryginału:', e.message);
+    return { data: imgBase64, mimeType, compressed: false, skipped: true };
+  }
 }
 
 // ─── Upload WordPress ─────────────────────────────────────────────────────────
@@ -309,6 +315,7 @@ export default async function handler(req, res) {
             });
           } else {
             // D7 – wstaw zdjęcie jako <img> na początku treści node
+            try {
             const lr = await fetch(`${baseUrl}/api/user/login.json`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -347,6 +354,7 @@ export default async function handler(req, res) {
               }).catch(e => console.log('D7 img inject:', e.message));
               await fetch(`${baseUrl}/api/user/logout.json`, { method: 'POST', headers: h7 }).catch(() => {});
             }
+            } catch(d7err) { console.log('D7 img1 inject error:', d7err.message); }
           }
         }
       }}
@@ -397,6 +405,7 @@ export default async function handler(req, res) {
 
         if (!d8ok) {
           // Drupal 7 – zaloguj, pobierz treść, wstaw img w połowie
+          try {
           const lr = await fetch(`${baseUrl}/api/user/login.json`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -438,7 +447,7 @@ export default async function handler(req, res) {
               }).catch(e => console.log('D7 img2 inject:', e.message));
               await fetch(`${baseUrl}/api/user/logout.json`, { method: 'POST', headers: h7 }).catch(() => {});
             }
-          }
+          } catch(d7err2) { console.log('D7 img2 inject error:', d7err2.message); }
         }
       }
     }
