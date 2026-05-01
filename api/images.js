@@ -368,7 +368,7 @@ export default async function handler(req, res) {
         }
 
       } else if (cms === 'drupal') {
-        media1 = await uploadToDrupal(compressed1.data, compressed1.mimeType, alt_text, img_title, 'featured', baseUrl, site_login, site_pass);
+        media1 = await uploadToDrupal(compressed1.data, compressed1.mimeType, alt_text, 'featured', baseUrl, site_login, site_pass);
         if (media1?.id && post_id) {
           const creds = Buffer.from(`${site_login}:${site_pass}`).toString('base64');
           const d8ok  = await fetch(`${baseUrl}/jsonapi`, {
