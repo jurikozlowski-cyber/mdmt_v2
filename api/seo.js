@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     const api_provider     = api_provider_raw === 'claude_haiku' ? 'claude' : api_provider_raw;
     const api_model        = api_provider_raw === 'claude_haiku' ? 'claude-haiku-4-5-20251001' : (body.api_model || '');
 
-    const shortArticle = article.substring(0, 2000);
+    const shortArticle = article.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").substring(0, 1000).trim();
     const systemPrompt = 'Jesteś ekspertem SEO. Odpowiadaj WYŁĄCZNIE w formacie JSON, bez komentarzy, bez markdown.';
     const siteNamePart = site_name ? ` | ${site_name}` : '';
     const maxTitleLen  = site_name ? (55 - siteNamePart.length) : 55;
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             system_instruction: { parts: [{ text: systemPrompt }] },
             contents: [{ parts: [{ text: userPrompt }] }],
-            generationConfig: { maxOutputTokens: 600, responseMimeType: 'application/json' }
+            generationConfig: { maxOutputTokens: 1000, responseMimeType: 'application/json' }
           })
         }).then(r => r.json())
       );
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
       const data = await withRetry(() =>
         fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-          body: JSON.stringify({ model, max_tokens: 600, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] })
+          body: JSON.stringify({ model, max_tokens: 1000, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] })
         }).then(r => r.json())
       );
       if (data.error) throw new Error(`OpenAI: ${data.error.message}`);
@@ -80,31 +80,48 @@ export default async function handler(req, res) {
         fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({ model, max_tokens: 600, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
+          body: JSON.stringify({ model, max_tokens: 1000, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
         }).then(r => r.json())
       );
       if (data.error) throw new Error(`Claude: ${data.error.message}`);
       raw = (data.content || []).map(b => b.text || '').join('\n').trim();
     }
 
-    // Debug log
-    console.log('[SEO] raw response length:', raw.length, '| first 200:', raw.substring(0, 200));
+    console.log('[SEO] raw length:', raw.length);
 
     let parsed;
-    // Próba 1: bezpośredni parse
-    try { parsed = JSON.parse(raw.replace(/```json|```/g, '').trim()); }
-    catch(e1) {
-      // Próba 2: wyciągnij JSON z tekstu (gdy model dodał komentarz przed/po)
-      const m = raw.match(/\{[\s\S]*?"meta_title"[\s\S]*?\}/);
-      try { parsed = m ? JSON.parse(m[0]) : null; } catch { parsed = null; }
+    const cleanRaw = raw.replace(/```json|```/g, '').trim();
 
-      if (!parsed) {
-        console.error('[SEO] parse failed:', e1.message, '| raw:', raw.substring(0, 300));
-        parsed = {
-          meta_title: topic.substring(0, 55),
-          meta_description: `${topic} – ${main_keyword}. Przeczytaj nasz artykuł i dowiedz się więcej.`.substring(0, 155),
-          seo_notes: 'Meta dane wygenerowane automatycznie.'
-        };
+    // Próba 1: bezpośredni parse
+    try { parsed = JSON.parse(cleanRaw); }
+    catch(e1) {
+      // Próba 2: napraw obcięty JSON – dodaj brakujące cudzysłowy i nawiasy
+      let repaired = cleanRaw;
+      if (!repaired.endsWith('}')) {
+        // Zamknij niezamknięte stringi i obiekt
+        const quoteCount = (repaired.match(/"/g) || []).length;
+        if (quoteCount % 2 !== 0) repaired += '"';
+        repaired += '}';
+      }
+      try { parsed = JSON.parse(repaired); }
+      catch {
+        // Próba 3: wyciągnij tylko meta_title i meta_description z surowego tekstu
+        const titleMatch = raw.match(/"meta_title"\s*:\s*"([^"]{1,60})"/);
+        const descMatch  = raw.match(/"meta_description"\s*:\s*"([^"]{1,155})"/);
+        if (titleMatch || descMatch) {
+          parsed = {
+            meta_title:       titleMatch ? titleMatch[1] : topic.substring(0, 55),
+            meta_description: descMatch  ? descMatch[1]  : `${topic} – ${main_keyword}.`.substring(0, 155),
+            seo_notes: ''
+          };
+        } else {
+          console.error('[SEO] all parse attempts failed | raw:', raw.substring(0, 200));
+          parsed = {
+            meta_title: topic.substring(0, 55),
+            meta_description: `${topic} – ${main_keyword}. Przeczytaj nasz artykuł i dowiedz się więcej.`.substring(0, 155),
+            seo_notes: 'Meta dane wygenerowane automatycznie.'
+          };
+        }
       }
     }
     // Dodaj nazwę witryny do meta_title
