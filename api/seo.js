@@ -35,13 +35,16 @@ export default async function handler(req, res) {
     const article          = body.article || '';
     const main_keyword     = body.main_keyword || '';
     const topic            = body.topic || '';
+    const site_name        = body.site_name || '';
     const api_provider_raw = body.api_provider || 'gemini';
     const api_provider     = api_provider_raw === 'claude_haiku' ? 'claude' : api_provider_raw;
     const api_model        = api_provider_raw === 'claude_haiku' ? 'claude-haiku-4-5-20251001' : (body.api_model || '');
 
     const shortArticle = article.substring(0, 2000);
     const systemPrompt = 'Jesteś ekspertem SEO. Odpowiadaj WYŁĄCZNIE w formacie JSON, bez komentarzy, bez markdown.';
-    const userPrompt   = `Przygotuj meta dane SEO.\nTemat: ${topic}\nFraza kluczowa: ${main_keyword}\nFragment artykułu: ${shortArticle}\n\nOdpowiedz TYLKO tym JSON:\n{"meta_title":"max 60 znaków z frazą kluczową","meta_description":"max 155 znaków zachęcający opis","seo_notes":"1 zdanie oceny SEO"}`;
+    const siteNamePart = site_name ? ` | ${site_name}` : '';
+    const maxTitleLen  = site_name ? (55 - siteNamePart.length) : 55;
+    const userPrompt   = `Przygotuj meta dane SEO.\nTemat: ${topic}\nFraza kluczowa: ${main_keyword}\nNazwa witryny: ${site_name || 'brak'}\nFragment artykułu: ${shortArticle}\n\nOdpowiedz TYLKO tym JSON (bez żadnego tekstu poza JSON):\n{"meta_title":"max ${maxTitleLen} znaków z frazą kluczową (BEZ nazwy witryny)","meta_description":"max 155 znaków – konkretny opis zachęcający do kliknięcia, zawiera frazę kluczową","seo_notes":"1 zdanie oceny SEO"}`;
 
     let raw = '';
 
@@ -86,7 +89,29 @@ export default async function handler(req, res) {
 
     let parsed;
     try { parsed = JSON.parse(raw.replace(/```json|```/g, '').trim()); }
-    catch { parsed = { meta_title: topic.substring(0, 60), meta_description: main_keyword.substring(0, 155), seo_notes: 'Meta dane wygenerowane automatycznie.' }; }
+    catch {
+      // Fallback – wyciągnij JSON z tekstu jeśli model dodał komentarz
+      const m = raw.match(/\{[^{}]*"meta_title"[^{}]*\}/);
+      try { parsed = m ? JSON.parse(m[0]) : null; } catch { parsed = null; }
+      if (!parsed) {
+        parsed = {
+          meta_title: topic.substring(0, 55),
+          meta_description: `${topic} – ${main_keyword}. Przeczytaj nasz artykuł i dowiedz się więcej.`.substring(0, 155),
+          seo_notes: 'Meta dane wygenerowane automatycznie.'
+        };
+      }
+    }
+    // Dodaj nazwę witryny do meta_title
+    if (site_name && parsed.meta_title) {
+      const suffix = ` | ${site_name}`;
+      const maxLen = 55;
+      parsed.meta_title = parsed.meta_title.substring(0, maxLen).trim() + suffix;
+    } else if (parsed.meta_title) {
+      parsed.meta_title = parsed.meta_title.substring(0, 60).trim();
+    }
+    if (parsed.meta_description) {
+      parsed.meta_description = parsed.meta_description.substring(0, 155).trim();
+    }
     parsed.corrected_article = article;
     return res.status(200).json({ result: parsed });
 

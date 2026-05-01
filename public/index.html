@@ -1616,7 +1616,9 @@ async function runPipeline() {
   setStatus('Faza 1/2 · Krok 3/4 – SEO');
   try {
     const r = await callWithFallback('seo', {
-      article, topic, main_keyword: mainKw.replace(/x\d+$/i,'').trim()
+      article, topic,
+      main_keyword: mainKw.replace(/x\d+$/i,'').trim(),
+      site_name: site?.name || ''
     });
     const d = r.result || {};
     article   = d.corrected_article || article;
