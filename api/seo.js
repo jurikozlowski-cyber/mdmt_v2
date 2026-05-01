@@ -44,7 +44,19 @@ export default async function handler(req, res) {
     const systemPrompt = 'Jesteś ekspertem SEO. Odpowiadaj WYŁĄCZNIE w formacie JSON, bez komentarzy, bez markdown.';
     const siteNamePart = site_name ? ` | ${site_name}` : '';
     const maxTitleLen  = site_name ? (55 - siteNamePart.length) : 55;
-    const userPrompt   = `Przygotuj meta dane SEO.\nTemat: ${topic}\nFraza kluczowa: ${main_keyword}\nNazwa witryny: ${site_name || 'brak'}\nFragment artykułu: ${shortArticle}\n\nOdpowiedz TYLKO tym JSON (bez żadnego tekstu poza JSON):\n{"meta_title":"max ${maxTitleLen} znaków z frazą kluczową (BEZ nazwy witryny)","meta_description":"max 155 znaków – konkretny opis zachęcający do kliknięcia, zawiera frazę kluczową","seo_notes":"1 zdanie oceny SEO"}`;
+    const userPrompt   = `Przygotuj meta dane SEO. Odpowiedz TYLKO czystym JSON bez żadnego tekstu.
+
+Dane:
+- Temat: ${topic}
+- Fraza kluczowa: ${main_keyword}
+- Fragment artykułu: ${shortArticle}
+
+WYMAGANIA (KRYTYCZNE):
+- meta_title: DOKŁADNIE ${maxTitleLen} znaków lub mniej, musi zawierać frazę kluczową, musi być kompletnym zdaniem, BEZ nazwy witryny
+- meta_description: DOKŁADNIE 155 znaków lub mniej, zachęca do kliknięcia, zawiera frazę kluczową, musi być kompletnym zdaniem
+- seo_notes: 1 krótkie zdanie
+
+{"meta_title":"...","meta_description":"...","seo_notes":"..."}`;
 
     let raw = '';
 
@@ -124,16 +136,25 @@ export default async function handler(req, res) {
         }
       }
     }
+    // Funkcja inteligentnego obcinania – nie tnie w połowie słowa
+    function smartTrim(str, maxLen) {
+      if (!str) return '';
+      str = str.trim();
+      if (str.length <= maxLen) return str;
+      const cut = str.lastIndexOf(' ', maxLen);
+      return cut > 0 ? str.substring(0, cut).trim() : str.substring(0, maxLen).trim();
+    }
+
     // Dodaj nazwę witryny do meta_title
     if (site_name && parsed.meta_title) {
-      const suffix = ` | ${site_name}`;
-      const maxLen = 55;
-      parsed.meta_title = parsed.meta_title.substring(0, maxLen).trim() + suffix;
+      const suffix   = ` | ${site_name}`;
+      const maxTitle = 60 - suffix.length;
+      parsed.meta_title = smartTrim(parsed.meta_title, maxTitle) + suffix;
     } else if (parsed.meta_title) {
-      parsed.meta_title = parsed.meta_title.substring(0, 60).trim();
+      parsed.meta_title = smartTrim(parsed.meta_title, 60);
     }
     if (parsed.meta_description) {
-      parsed.meta_description = parsed.meta_description.substring(0, 155).trim();
+      parsed.meta_description = smartTrim(parsed.meta_description, 155);
     }
     parsed.corrected_article = article;
     return res.status(200).json({ result: parsed });
