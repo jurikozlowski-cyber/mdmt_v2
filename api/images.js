@@ -1,5 +1,14 @@
 // api/images.js – generowanie (Gemini) → kompresja (TinyPNG) → upload (WP / Joomla / Drupal)
 
+function toSlugImg(str) {
+  if (!str) return 'zdjecie';
+  return str.toLowerCase()
+    .replace(/ą/g,'a').replace(/ć/g,'c').replace(/ę/g,'e').replace(/ł/g,'l')
+    .replace(/ń/g,'n').replace(/ó/g,'o').replace(/ś/g,'s').replace(/ź/g,'z').replace(/ż/g,'z')
+    .replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-')
+    .substring(0, 30).replace(/-+$/,'').trim();
+}
+
 async function withRetry(fn) {
   const delays = [0, 3000, 6000];
   let lastError;
@@ -237,6 +246,7 @@ async function uploadToDrupal(imgData, mimeType, altTxt, filename, baseUrl, logi
   const creds  = Buffer.from(`${login}:${pass}`).toString('base64');
   const buffer = Buffer.from(imgData, 'base64');
   const ext    = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png';
+  // D7 nie nadpisuje plików z tą samą nazwą ale tworzy duplikaty – dodajemy krótki suffix
   const fname  = `${filename}.${ext}`;
 
   // Sprawdź czy to D8+ przez jsonapi
@@ -337,6 +347,7 @@ export default async function handler(req, res) {
     const image_num  = body.image_num || 1;
 
     const img_model   = (body.img_model || 'gemini').toLowerCase();
+    const titleSlug   = toSlugImg(body.img_title || body.alt1 || '');
     const GEMINI_KEY  = process.env.GEMINI_API_KEY;
     const OPENAI_KEY  = process.env.OPENAI_API_KEY;
     const TINYPNG_KEY = process.env.TINYPNG_API_KEY;
@@ -351,7 +362,7 @@ export default async function handler(req, res) {
       let   media1      = null;
 
       if (cms === 'wordpress') {
-        media1 = await uploadToWordPress(compressed1.data, compressed1.mimeType, alt_text, img_title, 'featured', baseUrl, site_login, site_pass);
+        media1 = await uploadToWordPress(compressed1.data, compressed1.mimeType, alt_text, img_title, `${titleSlug}-featured`, baseUrl, site_login, site_pass);
         // Ustaw jako featured image
         if (media1?.id && post_id) {
           const creds = Buffer.from(`${site_login}:${site_pass}`).toString('base64');
@@ -363,7 +374,7 @@ export default async function handler(req, res) {
         }
 
       } else if (cms === 'joomla') {
-        media1 = await uploadToJoomla(compressed1.data, compressed1.mimeType, alt_text, 'featured', baseUrl, site_pass);
+        media1 = await uploadToJoomla(compressed1.data, compressed1.mimeType, alt_text, `${titleSlug}-featured`, baseUrl, site_pass);
         // Joomla: wstaw img do treści artykułu (intro image przez PATCH)
         if (media1?.url && post_id) {
           await fetch(`${baseUrl}/api/index.php/v1/content/articles/${post_id}`, {
@@ -374,7 +385,7 @@ export default async function handler(req, res) {
         }
 
       } else if (cms === 'drupal') {
-        media1 = await uploadToDrupal(compressed1.data, compressed1.mimeType, alt_text, 'featured', baseUrl, site_login, site_pass);
+        media1 = await uploadToDrupal(compressed1.data, compressed1.mimeType, alt_text, `${titleSlug}-featured`, baseUrl, site_login, site_pass);
         if (media1?.id && post_id) {
           const creds = Buffer.from(`${site_login}:${site_pass}`).toString('base64');
           const d8ok  = await fetch(`${baseUrl}/jsonapi`, {
@@ -444,7 +455,7 @@ export default async function handler(req, res) {
     let   media2      = null;
 
     if (cms === 'wordpress') {
-      media2 = await uploadToWordPress(compressed2.data, compressed2.mimeType, alt_text2 || alt_text, img_title, 'srodtekstowe', baseUrl, site_login, site_pass);
+      media2 = await uploadToWordPress(compressed2.data, compressed2.mimeType, alt_text2 || alt_text, img_title, `${titleSlug}-srodtekstowe`, baseUrl, site_login, site_pass);
       // Wstaw śródtekstowo w połowie artykułu
       if (media2?.url && post_id) {
         const creds   = Buffer.from(`${site_login}:${site_pass}`).toString('base64');
@@ -467,10 +478,10 @@ export default async function handler(req, res) {
       }
 
     } else if (cms === 'joomla') {
-      media2 = await uploadToJoomla(compressed2.data, compressed2.mimeType, alt_text2 || alt_text, 'srodtekstowe', baseUrl, site_pass);
+      media2 = await uploadToJoomla(compressed2.data, compressed2.mimeType, alt_text2 || alt_text, `${titleSlug}-srodtekstowe`, baseUrl, site_pass);
 
     } else if (cms === 'drupal') {
-      media2 = await uploadToDrupal(compressed2.data, compressed2.mimeType, alt_text2 || alt_text, 'srodtekstowe', baseUrl, site_login, site_pass);
+      media2 = await uploadToDrupal(compressed2.data, compressed2.mimeType, alt_text2 || alt_text, `${titleSlug}-srodtekstowe`, baseUrl, site_login, site_pass);
       // D7 – wstaw zdjęcie śródtekstowe w połowie treści
       if (media2?.url && post_id) {
         const d8ok = await fetch(`${baseUrl}/jsonapi`, {
