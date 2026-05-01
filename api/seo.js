@@ -87,13 +87,19 @@ export default async function handler(req, res) {
       raw = (data.content || []).map(b => b.text || '').join('\n').trim();
     }
 
+    // Debug log
+    console.log('[SEO] raw response length:', raw.length, '| first 200:', raw.substring(0, 200));
+
     let parsed;
+    // Próba 1: bezpośredni parse
     try { parsed = JSON.parse(raw.replace(/```json|```/g, '').trim()); }
-    catch {
-      // Fallback – wyciągnij JSON z tekstu jeśli model dodał komentarz
-      const m = raw.match(/\{[^{}]*"meta_title"[^{}]*\}/);
+    catch(e1) {
+      // Próba 2: wyciągnij JSON z tekstu (gdy model dodał komentarz przed/po)
+      const m = raw.match(/\{[\s\S]*?"meta_title"[\s\S]*?\}/);
       try { parsed = m ? JSON.parse(m[0]) : null; } catch { parsed = null; }
+
       if (!parsed) {
+        console.error('[SEO] parse failed:', e1.message, '| raw:', raw.substring(0, 300));
         parsed = {
           meta_title: topic.substring(0, 55),
           meta_description: `${topic} – ${main_keyword}. Przeczytaj nasz artykuł i dowiedz się więcej.`.substring(0, 155),
