@@ -426,7 +426,7 @@ export default async function handler(req, res) {
             } catch(d7err) { console.log('D7 img1 inject error:', d7err.message); }
           }
         }
-      }}
+      }
 
       return res.status(200).json({ success: true, media_id: media1?.id, image_url: media1?.url, compressed: compressed1.compressed });
     }
@@ -475,22 +475,22 @@ export default async function handler(req, res) {
         if (!d8ok) {
           // Drupal 7 – zaloguj, pobierz treść, wstaw img w połowie
           try {
-          const lr = await fetch(`${baseUrl}/api/user/login.json`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ username: site_login, password: site_pass })
-          });
-          const ld = await lr.json();
-          if (ld.sessid) {
-            const h7 = {
-              'Content-Type': 'application/json', 'Accept': 'application/json',
-              'Cookie': `${ld.session_name}=${ld.sessid}`,
-              'X-CSRF-Token': ld.token || ''
-            };
-            const nodeRes  = await fetch(`${baseUrl}/api/node/${post_id}.json`, { headers: h7 });
-            const nodeData = await nodeRes.json();
-            let currentBody = nodeData?.body?.und?.[0]?.value || '';
-            if (currentBody) {
+            const lr = await fetch(`${baseUrl}/api/user/login.json`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+              body: JSON.stringify({ username: site_login, password: site_pass })
+            });
+            const ld = await lr.json();
+            if (ld.sessid) {
+              const h7 = {
+                'Content-Type': 'application/json', 'Accept': 'application/json',
+                'Cookie': `${ld.session_name}=${ld.sessid}`,
+                'X-CSRF-Token': ld.token || ''
+              };
+              const nodeRes  = await fetch(`${baseUrl}/api/node/${post_id}.json`, { headers: h7 });
+              const nodeData = await nodeRes.json();
+              let currentBody = nodeData?.body?.und?.[0]?.value || '';
+              if (currentBody) {
               // Znajdź środek artykułu po tagach zamykających
               const closingTags = [...currentBody.matchAll(/<\/(p|h[2-6]|ul|ol)>/gi)];
               const midTag      = closingTags[Math.floor(closingTags.length / 2)];
@@ -515,6 +515,7 @@ export default async function handler(req, res) {
                 })
               }).catch(e => console.log('D7 img2 inject:', e.message));
               await fetch(`${baseUrl}/api/user/logout.json`, { method: 'POST', headers: h7 }).catch(() => {});
+              }
             }
           } catch(d7err2) { console.log('D7 img2 inject error:', d7err2.message); }
         }
