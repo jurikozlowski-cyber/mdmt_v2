@@ -374,6 +374,13 @@ input[type="datetime-local"] { color-scheme: dark; }
         <label>Tytuł zdjęcia śródtekstowego (SEO)</label>
         <input id="img2_title" type="text" placeholder="tytul-zdjecia-2-seo (puste = auto)">
       </div>
+      <div class="field col2">
+        <label>Model generowania zdjęć</label>
+        <select id="img-model">
+          <option value="gemini">Gemini Imagen (domyślny) + DALL-E 3 fallback</option>
+          <option value="dalle">DALL-E 3 (OpenAI) + Gemini fallback</option>
+        </select>
+      </div>
     </div>
   </div>
 
@@ -705,6 +712,13 @@ input[type="datetime-local"] { color-scheme: dark; }
       <div class="field" style="margin:0;flex:0 0 auto">
         <label style="display:block;margin-bottom:4px">Fallback przy błędzie</label>
         <div style="font-size:12px;color:var(--muted);padding-top:4px" id="q-fallback-hint">Gemini → Sonnet → Haiku → GPT-4o-mini</div>
+      </div>
+      <div class="field" style="margin:0;flex:0 0 auto">
+        <label style="display:block;margin-bottom:4px">Model zdjęć</label>
+        <select id="q-img-model" style="width:auto;padding:6px 10px">
+          <option value="gemini">Gemini Imagen + DALL-E fallback</option>
+          <option value="dalle">DALL-E 3 + Gemini fallback</option>
+        </select>
       </div>
       <div id="q-progress-info" style="display:none;margin-left:auto;font-size:13px;color:var(--accent)">
         <span id="q-progress-text">0/0 ukończonych</span>
@@ -1716,7 +1730,8 @@ async function runPipeline() {
           cms, site_url: site.url, site_login: site.login, site_pass: site.password_enc,
           post_id: postId, image_num: 1,
           prompt1: img1_prompt, alt1: img1_alt,
-          img_title: img_title + '-featured'
+          img_title: img_title + '-featured',
+          img_model: document.getElementById('img-model')?.value || 'gemini'
         });
         if (!r.image_url) throw new Error('Brak URL obrazu');
         document.getElementById('img1-preview').innerHTML = `<img src="${r.image_url}" alt="featured">`;
@@ -1762,7 +1777,8 @@ async function runPipeline() {
           post_id: postId, image_num: 2,
           prompt1: img1_prompt, prompt2: img2_prompt,
           alt1: img1_alt, alt2: img2_alt,
-          img_title: img2_title
+          img_title: img2_title,
+          img_model: document.getElementById('img-model')?.value || 'gemini'
         });
         if (!r.image_url) throw new Error('Brak URL obrazu');
         document.getElementById('img2-preview').innerHTML = `<img src="${r.image_url}" alt="srodtekstowe">`;
@@ -2677,7 +2693,8 @@ async function startQueue() {
               post_id: postId, image_num: 2,
               prompt1: imgPrompt, prompt2: img2Prompt,
               alt1: autoAlt1, alt2: autoAlt2,
-              img_title: autoImgTitle
+              img_title: autoImgTitle,
+              img_model: document.getElementById('q-img-model')?.value || 'gemini'
             })
           }).then(r => r.json());
         } catch(e) { console.warn('img2 queue error:', e.message); }

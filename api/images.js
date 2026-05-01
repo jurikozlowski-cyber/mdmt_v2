@@ -27,16 +27,11 @@ async function generateImageGemini(promptText, GEMINI_KEY) {
     contents: [{ parts: [{ text: fullPrompt }] }],
     generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '16:9' } }
   };
-
-  // Bez withRetry – błąd musi przejść do generateImage żeby uruchomić fallback DALL-E 3
-  const res  = await fetch(
+  // Identycznie jak v1 – .then(r => r.json()) bez dodatkowego parsowania
+  const data = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_KEY}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
-  );
-  const text = await res.text();
-  let data;
-  try { data = JSON.parse(text); }
-  catch { throw new Error(`Gemini niedostępny (${res.status}): ${text.substring(0, 60)}`); }
+  ).then(r => r.json());
 
   if (data.error) throw new Error(`Gemini: ${data.error.message}`);
   const parts   = data.candidates?.[0]?.content?.parts || [];
@@ -70,30 +65,45 @@ async function generateImageDalle(promptText, OPENAI_KEY) {
   return { data: b64, mimeType: 'image/png' };
 }
 
-async function generateImage(promptText, GEMINI_KEY, OPENAI_KEY) {
-  // 2 próby Gemini
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      if (attempt > 1) await new Promise(r => setTimeout(r, 3000));
-      return await generateImageGemini(promptText, GEMINI_KEY);
-    } catch(e) {
-      console.log(`[GENEROWANIE] Gemini próba ${attempt}/2 błąd: ${e.message}`);
+async function generateImage(promptText, GEMINI_KEY, OPENAI_KEY, img_model) {
+  const useGeminiFirst = (img_model || 'gemini') !== 'dalle';
+
+  // Funkcje pomocnicze z retry
+  async function tryGemini() {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        if (attempt > 1) await new Promise(r => setTimeout(r, 3000));
+        return await generateImageGemini(promptText, GEMINI_KEY);
+      } catch(e) {
+        console.log(`[GENEROWANIE] Gemini próba ${attempt}/2: ${e.message}`);
+        if (attempt === 2) throw e;
+      }
     }
   }
-  // 2 próby DALL-E 3
-  if (OPENAI_KEY) {
+
+  async function tryDalle() {
+    if (!OPENAI_KEY) throw new Error('Brak klucza OPENAI_API_KEY');
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         if (attempt > 1) await new Promise(r => setTimeout(r, 3000));
         console.log(`[GENEROWANIE] DALL-E 3 próba ${attempt}/2`);
         return await generateImageDalle(promptText, OPENAI_KEY);
       } catch(e) {
-        console.log(`[GENEROWANIE] DALL-E 3 próba ${attempt}/2 błąd: ${e.message}`);
-        if (attempt === 2) throw new Error(`[GENEROWANIE] Gemini i DALL-E 3 niedostępne: ${e.message}`);
+        console.log(`[GENEROWANIE] DALL-E 3 próba ${attempt}/2: ${e.message}`);
+        if (attempt === 2) throw e;
       }
     }
   }
-  throw new Error('[GENEROWANIE] Wszystkie modele obrazów niedostępne');
+
+  if (useGeminiFirst) {
+    // Gemini główny → DALL-E 3 fallback
+    try { return await tryGemini(); } catch(e) { console.log('[GENEROWANIE] Gemini zawiódł, próbuję DALL-E 3'); }
+    try { return await tryDalle(); } catch(e) { throw new Error(`[GENEROWANIE] Gemini i DALL-E 3 niedostępne: ${e.message}`); }
+  } else {
+    // DALL-E 3 główny → Gemini fallback
+    try { return await tryDalle(); } catch(e) { console.log('[GENEROWANIE] DALL-E 3 zawiódł, próbuję Gemini'); }
+    try { return await tryGemini(); } catch(e) { throw new Error(`[GENEROWANIE] DALL-E 3 i Gemini niedostępne: ${e.message}`); }
+  }
 }
 
 // ─── Kompresja (TinyPNG) ──────────────────────────────────────────────────────
@@ -320,6 +330,7 @@ export default async function handler(req, res) {
     const img_title  = body.img_title || '';
     const image_num  = body.image_num || 1;
 
+    const img_model   = (body.img_model || 'gemini').toLowerCase();
     const GEMINI_KEY  = process.env.GEMINI_API_KEY;
     const OPENAI_KEY  = process.env.OPENAI_API_KEY;
     const TINYPNG_KEY = process.env.TINYPNG_API_KEY;
@@ -329,7 +340,7 @@ export default async function handler(req, res) {
 
     // ── Zdjęcie 1 (featured / wyróżnione) ────────────────
     if (image_num === 1) {
-      const img1        = await generateImage(prompt, GEMINI_KEY, OPENAI_KEY);
+      const img1        = await generateImage(prompt, GEMINI_KEY, OPENAI_KEY, img_model);
       const compressed1 = await compressImage(img1.data, img1.mimeType, TINYPNG_KEY);
       let   media1      = null;
 
@@ -422,7 +433,7 @@ export default async function handler(req, res) {
 
     // ── Zdjęcie 2 (śródtekstowe) ──────────────────────────
     const promptToUse = prompt2 || prompt;
-    const img2        = await generateImage(promptToUse, GEMINI_KEY, OPENAI_KEY);
+    const img2        = await generateImage(promptToUse, GEMINI_KEY, OPENAI_KEY, img_model);
     const compressed2 = await compressImage(img2.data, img2.mimeType, TINYPNG_KEY);
     let   media2      = null;
 
