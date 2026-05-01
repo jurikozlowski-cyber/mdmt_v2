@@ -293,8 +293,15 @@ async function uploadToDrupal(imgData, mimeType, altTxt, filename, baseUrl, logi
 
   if (!fileData7.fid) throw new Error(`[DODAWANIE DRUPAL 7] Brak fid: ${fileText7.substring(0,200)}`);
 
-  const fid    = fileData7.fid;
-  const fileUrl7 = fileData7.uri ? `${baseUrl}/${fileData7.uri.replace('public://', 'sites/default/files/')}` : `${baseUrl}/sites/default/files/${fname}`;
+  const fid = fileData7.fid;
+  // D7 zwraca uri jako 'public://filename.jpg' – konwertujemy na /sites/default/files/filename.jpg
+  let fileUrl7 = `${baseUrl}/sites/default/files/${fname}`;
+  if (fileData7.uri) {
+    const cleanUri = fileData7.uri.replace('public://', '').replace(/^\//, '');
+    fileUrl7 = `${baseUrl}/sites/default/files/${cleanUri}`;
+  } else if (fileData7.url) {
+    fileUrl7 = fileData7.url.startsWith('http') ? fileData7.url : `${baseUrl}${fileData7.url}`;
+  }
 
   // Wyloguj
   try { await fetch(`${baseUrl}/api/user/logout.json`, { method: 'POST', headers: d7H }); } catch(e) {}
