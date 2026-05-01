@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     const api_provider     = api_provider_raw === 'claude_haiku' ? 'claude' : api_provider_raw;
     const api_model        = api_provider_raw === 'claude_haiku' ? 'claude-haiku-4-5-20251001' : (body.api_model || '');
 
-    const shortArticle = article.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").substring(0, 1000).trim();
+    const shortArticle = article.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").substring(0, 500).trim();
     const systemPrompt = 'Jesteś ekspertem SEO. Odpowiadaj WYŁĄCZNIE w formacie JSON, bez komentarzy, bez markdown.';
     const siteNamePart = site_name ? ` | ${site_name}` : '';
     const maxTitleLen  = site_name ? (55 - siteNamePart.length) : 55;
@@ -68,7 +68,7 @@ WYMAGANIA (KRYTYCZNE):
           body: JSON.stringify({
             system_instruction: { parts: [{ text: systemPrompt }] },
             contents: [{ parts: [{ text: userPrompt }] }],
-            generationConfig: { maxOutputTokens: 1000, responseMimeType: 'application/json' }
+            generationConfig: { maxOutputTokens: 2000, responseMimeType: 'application/json' }
           })
         }).then(r => r.json())
       );
@@ -80,7 +80,7 @@ WYMAGANIA (KRYTYCZNE):
       const data = await withRetry(() =>
         fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-          body: JSON.stringify({ model, max_tokens: 1000, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] })
+          body: JSON.stringify({ model, max_tokens: 2000, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] })
         }).then(r => r.json())
       );
       if (data.error) throw new Error(`OpenAI: ${data.error.message}`);
@@ -92,7 +92,7 @@ WYMAGANIA (KRYTYCZNE):
         fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({ model, max_tokens: 1000, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
+          body: JSON.stringify({ model, max_tokens: 2000, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] })
         }).then(r => r.json())
       );
       if (data.error) throw new Error(`Claude: ${data.error.message}`);
@@ -141,8 +141,11 @@ WYMAGANIA (KRYTYCZNE):
       if (!str) return '';
       str = str.trim();
       if (str.length <= maxLen) return str;
+      // Znajdź ostatnią spację przed limitem
       const cut = str.lastIndexOf(' ', maxLen);
-      return cut > 0 ? str.substring(0, cut).trim() : str.substring(0, maxLen).trim();
+      // Jeśli obcięcie dałoby za krótki wynik (< 50% limitu), użyj twardego obcięcia
+      const result = (cut > maxLen * 0.5) ? str.substring(0, cut).trim() : str.substring(0, maxLen).trim();
+      return result;
     }
 
     // Dodaj nazwę witryny do meta_title
